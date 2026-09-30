@@ -90,6 +90,11 @@ body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-si
 </style>
 </head>
 <body>
+<a href="https://omarenriqueibarra.github.io/gestion-mantenimiento/" title="Volver al tablero"
+   style="position:fixed;left:16px;bottom:16px;z-index:998;background:#1c1a17;color:#fff;text-decoration:none;
+          font-family:Inter,sans-serif;font-size:13px;font-weight:700;padding:10px 16px;border-radius:24px;
+          box-shadow:0 4px 12px rgba(0,0,0,.25)">← Volver al tablero</a>
+
 
 <div class="hdr">
   <div class="hdr-left">
@@ -2048,7 +2053,7 @@ function showToast(msg){
 }
 
 // ══════════════════════════════════════════════════════════════
-// SINCRONIZACIÓN CON GOOGLE SHEETS (v7)
+// SINCRONIZACIÓN CON GOOGLE SHEETS (v9)
 // No cambia la lógica del gestor: cada vez que la app guarda en el navegador,
 // se manda una copia a la planilla. Al abrir, se trae lo último de la planilla.
 // ══════════════════════════════════════════════════════════════
@@ -2098,7 +2103,7 @@ function syncInicio(){
   // Si quedaron cambios sin subir (ej. se cortó internet), manda lo local primero
   if(localStorage.getItem(SYNC_PEND)){ init(); syncSubir(); return; }
   fetch(SCRIPT_URL).then(function(r){ return r.json(); }).then(function(res){
-    if(res && res.data){
+    if(res && res.data && Object.keys(res.data).length){
       // La planilla manda: se copian sus datos al navegador
       SYNC_KEYS.forEach(function(k){
         if(res.data[k]!==undefined) _setOrig.call(localStorage, k, res.data[k]);
