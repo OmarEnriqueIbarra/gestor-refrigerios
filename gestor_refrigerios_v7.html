@@ -1,0 +1,2123 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Gestor de Suministros — Akapol</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
+:root{
+  --bg:#f0ede8;--card:#fff;--tx:#1c1a17;--mu:#7a7570;--br:#dedad4;
+  --ac:#c45c1a;--ac2:#e8956d;--head:#1c1a17;--gn:#2e7d32;--gn2:#d4edda;
+  --yl:#f59e0b;--yl2:#fef3c7;--rd:#c0392b;--rd2:#fdecea;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif;font-size:14px;min-height:100vh;}
+
+.hdr{background:var(--head);color:#fff;padding:16px 28px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;}
+.hdr-left .ey{font-size:9px;letter-spacing:.2em;text-transform:uppercase;color:var(--ac2);font-family:'Space Mono',monospace;margin-bottom:3px;}
+.hdr-left h1{font-size:20px;font-weight:800;}
+.hdr-right{display:flex;gap:8px;align-items:center;}
+
+.tabs{display:flex;background:#fff;border-bottom:2px solid var(--br);padding:0 24px;}
+.tab{padding:12px 18px;font-size:13px;font-weight:700;cursor:pointer;border:none;background:none;color:var(--mu);border-bottom:3px solid transparent;margin-bottom:-2px;font-family:'Inter',sans-serif;}
+.tab.on{color:var(--ac);border-bottom-color:var(--ac);}
+.pnl{display:none;padding:20px 24px;}
+.pnl.on{display:block;}
+
+.btn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;border:none;font-family:'Inter',sans-serif;transition:opacity .15s;}
+.btn:hover{opacity:.85;}
+.btn-ac{background:var(--ac);color:#fff;}
+.btn-gn{background:var(--gn);color:#fff;}
+.btn-out{background:transparent;border:1.5px solid var(--br);color:var(--mu);}
+.btn-sm{padding:6px 12px;font-size:11px;}
+
+.card{background:var(--card);border-radius:12px;border:1px solid var(--br);overflow:hidden;box-shadow:0 1px 6px rgba(0,0,0,.05);margin-bottom:16px;}
+.card-hdr{background:var(--head);color:#fff;padding:10px 16px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;display:flex;align-items:center;justify-content:space-between;}
+.card-hdr span{font-size:10px;color:#888;font-weight:400;text-transform:none;letter-spacing:0;}
+.card-body{padding:16px;}
+
+/* STATS */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px;}
+.sc{background:var(--card);border:1px solid var(--br);border-radius:10px;padding:12px 16px;}
+.sc .n{font-size:26px;font-weight:800;font-family:'Space Mono',monospace;color:var(--ac);line-height:1;}
+.sc .l{font-size:10px;color:var(--mu);text-transform:uppercase;letter-spacing:.06em;margin-top:3px;font-weight:600;}
+
+/* TEXTAREA */
+.wa-inp{width:100%;min-height:200px;border:1.5px solid var(--br);border-radius:10px;padding:14px;font-size:12px;font-family:'Space Mono',monospace;color:var(--tx);background:#fafaf8;outline:none;resize:vertical;line-height:1.7;}
+.wa-inp::placeholder{color:#bbb;}
+.wa-inp:focus{border-color:var(--ac);}
+
+/* PEDIDOS */
+.ped-card{background:var(--card);border-radius:10px;border:1px solid var(--br);padding:14px 16px;margin-bottom:12px;border-left:4px solid var(--yl);}
+.ped-card.entregado{border-left-color:var(--gn);}
+.ped-nom{font-size:14px;font-weight:700;color:var(--tx);}
+.ped-sub{font-size:12px;color:var(--mu);margin-top:2px;}
+.ped-items{margin-top:10px;}
+.ped-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--br);font-size:12px;}
+.ped-row:last-child{border-bottom:none;}
+.ped-qty{font-family:'Space Mono',monospace;font-weight:700;color:var(--ac);}
+.badge-pend{background:var(--yl2);color:#856404;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;}
+.badge-done{background:var(--gn2);color:var(--gn);border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;}
+
+/* STOCK */
+.stock-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px;}
+.stock-item{background:var(--card);border-radius:10px;border:1px solid var(--br);padding:12px 14px;}
+.stock-item.bajo{border-color:#fcd34d;background:var(--yl2);}
+.stock-item.sin{border-color:#fca5a5;background:var(--rd2);}
+.stock-nom{font-size:11px;font-weight:600;color:var(--mu);margin-bottom:6px;line-height:1.3;}
+.stock-qty{font-size:28px;font-weight:800;font-family:'Space Mono',monospace;color:var(--tx);line-height:1;}
+.stock-un{font-size:11px;color:var(--mu);}
+.stock-dot{font-size:10px;margin-top:4px;}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:200;display:flex;align-items:center;justify-content:center;}
+.modal{background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw;max-height:85vh;overflow-y:auto;}
+.modal h3{font-size:16px;font-weight:800;margin-bottom:14px;}
+.inp{border:1.5px solid var(--br);border-radius:8px;padding:8px 12px;font-size:13px;font-family:'Inter',sans-serif;background:#fff;outline:none;color:var(--tx);width:100%;}
+.inp:focus{border-color:var(--ac);}
+.inp-num{width:80px;text-align:center;}
+
+.empty{text-align:center;padding:36px;color:var(--mu);font-size:13px;}
+.empty .ico{font-size:32px;margin-bottom:10px;}
+
+@media(max-width:700px){
+  .hdr,.pnl{padding:14px 16px;}
+  .tabs{padding:0 10px;}
+  .stats{grid-template-columns:repeat(2,1fr);}
+  .stock-grid{grid-template-columns:repeat(2,1fr);}
+}
+</style>
+</head>
+<body>
+
+<div class="hdr">
+  <div class="hdr-left">
+    <div class="ey">Akapol · Suministros</div>
+    <h1>Gestor de Refrigerios</h1>
+  </div>
+  <div class="hdr-right">
+    <span id="syncEstado" title="Estado de guardado en la planilla" style="font-size:11px;font-weight:700;padding:4px 10px;border-radius:10px;background:rgba(255,255,255,.12);color:#fff">⏳ Conectando…</span>
+    <button class="btn btn-out btn-sm" onclick="abrirCalculadora()">🧮 Calculadora</button>
+    <button class="btn btn-out btn-sm" onclick="exportarExcel()">⬇ Excel</button>
+    <button class="btn btn-out btn-sm" onclick="limpiarPruebas()">🧹 Pruebas</button>
+  </div>
+</div>
+
+<div class="tabs">
+  <button class="tab on" id="tab0" onclick="goTab(0)">📱 Procesar pedido</button>
+  <button class="tab"    id="tab1" onclick="goTab(1)">📋 Pedidos <span id="badgePend" style="background:var(--yl);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px">0</span></button>
+  <button class="tab"    id="tab2" onclick="goTab(2)">📦 Stock</button>
+  <button class="tab"    id="tab3" onclick="goTab(3)">🗓️ Historial</button>
+  <button class="tab"    id="tab4" onclick="goTab(4)">🛒 Compras <span id="badgeCompras" style="background:var(--rd);color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:4px">0</span></button>
+  <button class="tab"    id="tab5" onclick="goTab(5)">💰 Gastos</button>
+</div>
+
+<!-- TAB 3: HISTORIAL (quién pidió, qué día, qué pidió — para cotejar contra WhatsApp) -->
+<div class="pnl" id="pnl3">
+  <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px">
+    <select id="histMesSel" onchange="generarHistorial()" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--br);background:var(--s1);color:var(--tx)"></select>
+    <button class="btn" onclick="generarHistorial()" style="background:var(--ac);color:#fff;border:none">📊 Generar</button>
+    <div style="display:flex;border:1px solid var(--br);border-radius:8px;overflow:hidden">
+      <button id="histBtnGrilla" onclick="cambiarVistaHistorial('grilla')" style="padding:6px 12px;font-size:12px;font-weight:700;border:none;cursor:pointer">🔲 Grilla</button>
+      <button id="histBtnLista" onclick="cambiarVistaHistorial('lista')" style="padding:6px 12px;font-size:12px;font-weight:700;border:none;cursor:pointer;border-left:1px solid var(--br)">📋 Lista</button>
+    </div>
+    <button class="btn" onclick="exportarHistorial()" style="background:none;border:1px solid var(--br);color:var(--tx);margin-left:auto">⬇ Excel</button>
+  </div>
+  <div style="font-size:12px;font-weight:700;margin:6px 0 10px">🗓️ Cotejalo contra el WhatsApp — pasá el mouse por una celda para ver el detalle</div>
+  <div id="historialGrillaBody"></div>
+  <div id="historialListaBody" style="display:none"></div>
+
+  <div onclick="toggleResumenInsumo()" style="cursor:pointer;font-size:12px;font-weight:700;margin:22px 0 10px;display:flex;align-items:center;gap:6px;user-select:none">
+    <span id="iconResumenInsumo" style="display:inline-block;width:16px;height:16px;line-height:14px;text-align:center;border:1px solid var(--br);border-radius:4px;color:var(--ac);font-weight:800">+</span> 📊 Resumen por insumo (precios editables)
+  </div>
+  <div id="resumenInsumoWrap" style="display:none">
+    <div style="font-size:11px;color:var(--mu);margin-bottom:16px">Los precios del resumen son editables: al cambiar uno queda guardado como precio vigente (por ejemplo, el de la última compra) y se usa en todo el sistema — acá, en Compras y en Gastos.</div>
+    <div id="historialResumenBody"></div>
+  </div>
+</div>
+
+<!-- TAB 4: COMPRAS -->
+<div class="pnl" id="pnl4">
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-gn" onclick="exportarCompras()">⬇ Exportar lista de compras</button>
+    <span style="font-size:12px;color:var(--mu)">Suministros con stock igual o menor al mínimo</span>
+  </div>
+  <div id="comprasBody"></div>
+</div>
+
+<!-- TAB 5: GASTOS -->
+<div class="pnl" id="pnl5">
+  <div id="gastosBody"></div>
+</div>
+
+<!-- TAB 0: PROCESAR PEDIDO -->
+<div class="pnl on" id="pnl0">
+  <div class="card">
+    <div class="card-hdr">📱 Pegá uno o varios mensajes de WhatsApp <span>Al confirmar, se descuenta el stock automáticamente</span></div>
+    <div class="card-body">
+      <textarea class="wa-inp" id="waMsg" placeholder="Pegá uno o varios mensajes juntos. El sistema detecta automáticamente cada pedido.
+
+PEDIDO DE SUMINISTROS - AKAPOL
+-----------------------------
+Fecha: 27/06/2026
+..."></textarea>
+      <div style="display:flex;gap:8px;margin-top:12px;align-items:center;flex-wrap:wrap">
+        <button class="btn btn-ac" onclick="procesarMensaje()">⚡ Procesar pedido</button>
+        <button class="btn btn-out" onclick="document.getElementById('waMsg').value=''">✕ Limpiar</button>
+        <span id="procStatus" style="font-size:12px;color:var(--mu)"></span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Preview del pedido procesado -->
+  <div id="previewDiv" style="display:none">
+    <div class="card">
+      <div class="card-hdr">✅ Pedido detectado — confirmá antes de registrar</div>
+      <div class="card-body" id="previewBody"></div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn btn-gn" onclick="confirmarPedido()">✓ Registrar pedido</button>
+      <button class="btn btn-out" onclick="cancelarPreview()">✕ Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- TAB 1: PEDIDOS -->
+<div class="pnl" id="pnl1">
+  <div class="stats">
+    <div class="sc"><div class="n" id="stTotal">0</div><div class="l">Total</div></div>
+    <div class="sc"><div class="n" id="stPend" style="color:var(--yl)">0</div><div class="l">Pendientes</div></div>
+    <div class="sc"><div class="n" id="stDone" style="color:var(--gn)">0</div><div class="l">Entregados</div></div>
+    <div class="sc"><div class="n" id="stPersonas">0</div><div class="l">Personas</div></div>
+  </div>
+  <!-- Filtros -->
+  <div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+    <select id="filtroSector" class="inp" style="width:220px" onchange="renderPedidos()">
+      <option value="">Todos los sectores</option>
+    </select>
+    <button class="btn btn-out btn-sm" onclick="exportarPedidos()">💾 Exportar respaldo Excel</button>
+  </div>
+  <div id="pedidosBody"></div>
+</div>
+
+<!-- TAB 2: STOCK -->
+<div class="pnl" id="pnl2">
+  <div style="display:flex;justify-content:flex-end;margin-bottom:12px">
+    <button onclick="abrirModalNuevoSuministro()" style="background:var(--ac);color:#fff;border:none;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">➕ Agregar suministro</button>
+  </div>
+  <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-ac" onclick="abrirIngreso()">+ Ingreso de compra</button>
+    <button class="btn btn-out btn-sm" onclick="abrirEditarStock()">✏️ Editar stock</button>
+    <button class="btn btn-out btn-sm" onclick="abrirCargaExcel()">📊 Cargar Excel</button>
+    <button class="btn btn-out btn-sm" onclick="exportarMovimientosStock()">⬇ Movimientos</button>
+    <span style="font-size:11px;color:var(--mu);margin-left:4px">Saldo al día: <strong id="fechaStock"></strong></span>
+  </div>
+  <div class="stock-grid" id="stockGrid"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script>
+var SK_PED  = 'akapol_gest_pedidos_v1';
+var SK_STOCK= 'akapol_gest_stock_v2';
+
+// Lista de suministros (los 23 del sistema)
+var SUMINISTROS = [{"id": "s01", "nom": "Leche liquida la Serenísima x 1 Lts.", "precio": 2383.5, "min": 96, "max": 240}, {"id": "s02", "nom": "Leche en pólvo la Serenesima descremada x  800 grs", "precio": 11554.13, "min": 10, "max": 20}, {"id": "s03", "nom": "Leche en pólvo la Serenesima Entera x  800 grs", "precio": 11554.13, "min": 10, "max": 20}, {"id": "s04", "nom": "Café molido  x 1 kg ( calidad Virginia/ La Morenita )", "precio": 23853.78, "min": 12, "max": 24}, {"id": "s05", "nom": "Café blend selecto tostado en grano x kg", "precio": 30800.0, "min": 12, "max": 24}, {"id": "s06", "nom": "Café Instantáneo Arlistan x 170  grs", "precio": 8580.5, "min": 15, "max": 30}, {"id": "s07", "nom": "Café instantáneo suave Nescafé Dolca x 170  grs", "precio": 11100.17, "min": 12, "max": 24}, {"id": "s08", "nom": "Café instantáneo Fuerte Nescafé Dolca x 170  grs", "precio": 11100.17, "min": 12, "max": 24}, {"id": "s09", "nom": "Azúcar x 1 kg común", "precio": 1702.48, "min": 100, "max": 350}, {"id": "s10", "nom": "Mate cocido caja x 50 saquitos", "precio": 2117.68, "min": 15, "max": 30}, {"id": "s11", "nom": "Caja Té común  x  50 Un (Taragui/ la virginia / Morenita)", "precio": 1517.81, "min": 15, "max": 30}, {"id": "s12", "nom": "Caja de té de manzanilla  x  25 Un (Taragui/ la virginia / Morenita)", "precio": 1608.45, "min": 3, "max": 6}, {"id": "s13", "nom": "Caja de té de boldo x  25 Un (Taragui/ la virginia / Morenita)", "precio": 1952.88, "min": 3, "max": 6}, {"id": "s14", "nom": "Caja de té variedad x  25 Un (Taragui/ la virginia / Morenita)", "precio": 1766.65, "min": 3, "max": 6}, {"id": "s15", "nom": "Edulcorante Equal Sweet", "precio": 2501.69, "min": 15, "max": 30}, {"id": "s16", "nom": "Edulcorante Stevia", "precio": 5471.08, "min": 15, "max": 30}, {"id": "s17", "nom": "Vasos plásticos x180cc  paquetes x 50 UN", "precio": 1190.0, "min": 15000, "max": 45000, "mult": 50}, {"id": "s18", "nom": "Vasos Telgopor térmico Pquetes  x 25  UN", "precio": 4103.35, "min": 15000, "max": 45000, "mult": 25}, {"id": "s19", "nom": "Cucharitas plásticas  bolsa por 100 un", "precio": 1630.2, "min": 2000, "max": 7000, "mult": 100}, {"id": "s20", "nom": "Revolvedor Agitador Para Café bolsa por 100 un", "precio": 1630.2, "min": 1500, "max": 4000, "mult": 100}, {"id": "s21", "nom": "Servilletas de papel x paquetes de 250 un", "precio": 2572.83, "min": 35000, "max": 75000, "mult": 250}, {"id": "s22", "nom": "Rollo de papel x unidad", "precio": 6215.0, "min": 8, "max": 16}, {"id": "s23", "nom": "Bidones de agua x 20 ls", "precio": 3719.01, "min": 25, "max": 50}];
+
+var STOCK_INICIAL = {"s01": 216, "s02": 26, "s03": 7, "s04": 19, "s05": 11, "s06": 36, "s07": 6, "s08": 11, "s09": 340, "s10": 26, "s11": 14, "s12": 4, "s13": 2, "s14": 2, "s15": 30, "s16": 33, "s17": 39000, "s18": 28000, "s19": 6000, "s20": 3000, "s21": 27500, "s22": 14, "s23": 10};
+var STOCK_MES_INICIAL = {};
+var AJUSTES_STOCK = {};  // {sid: [{fecha, qty, anterior}]}
+
+var PEDIDOS = [];
+var STOCK   = {};
+var pedidosTemp = [];
+
+// ── INIT ──
+function init(){
+  document.getElementById('fechaStock').textContent = new Date().toLocaleDateString('es-AR');
+  cargarPreciosCustom(); // precios editados (ej. última compra) — antes no se cargaban al iniciar
+  cargarBajas();
+  load();
+  renderStock();
+  renderPedidos();
+  actualizarBadge();
+}
+
+var PRECIOS_CUSTOM = {}; // precios editados por el usuario
+
+function cargarPreciosCustom(){
+  try{
+    var raw=localStorage.getItem('akapol_precios');
+    if(raw) PRECIOS_CUSTOM=JSON.parse(raw);
+  }catch(e){}
+}
+
+function guardarPrecioCustom(id, precio){
+  PRECIOS_CUSTOM[id]=precio;
+  localStorage.setItem('akapol_precios', JSON.stringify(PRECIOS_CUSTOM));
+}
+
+// ── SUMINISTROS DADOS DE BAJA ──
+// Un suministro "de baja" no se ofrece más para pedir ni aparece en Compras/Ingreso,
+// pero el historial de meses anteriores que lo usó sigue funcionando igual (no se borra nada).
+var SUMINISTROS_BAJA = {}; // {sid: true}
+
+function cargarBajas(){
+  try{
+    var raw=localStorage.getItem('akapol_bajas');
+    if(raw) SUMINISTROS_BAJA=JSON.parse(raw);
+  }catch(e){}
+}
+
+function guardarBajas(){
+  localStorage.setItem('akapol_bajas', JSON.stringify(SUMINISTROS_BAJA));
+}
+
+function esActivo(sid){ return !SUMINISTROS_BAJA[sid]; }
+
+function darDeBaja(sid){
+  var s=SUMINISTROS.find(function(x){return x.id===sid;});
+  if(!s) return;
+  if(!confirm('¿Dar de baja "'+s.nom+'"?\n\nNo se va a poder pedir más ni aparecerá en Compras, pero el historial de meses anteriores no se toca.')) return;
+  SUMINISTROS_BAJA[sid]=true;
+  guardarBajas();
+  renderStock();
+  actualizarBadge();
+  showToast('✓ "'+s.nom+'" dado de baja');
+}
+
+function darDeAlta(sid){
+  var s=SUMINISTROS.find(function(x){return x.id===sid;});
+  delete SUMINISTROS_BAJA[sid];
+  guardarBajas();
+  renderStock();
+  actualizarBadge();
+  showToast('✓ "'+(s?s.nom:sid)+'" dado de alta de nuevo');
+}
+
+function getPrecio(id){
+  return PRECIOS_CUSTOM[id]!==undefined ? PRECIOS_CUSTOM[id] : (SUMINISTROS.find(function(s){return s.id===id;})||{precio:0}).precio;
+}
+
+function formatPeso(n){
+  return '$'+Math.round(n).toLocaleString('es-AR');
+}
+
+function load(){
+  try{
+    var p=localStorage.getItem(SK_PED); if(p) PEDIDOS=JSON.parse(p);
+    var s=localStorage.getItem(SK_STOCK); if(s) STOCK=JSON.parse(s);
+    // Restaurar stock mes inicial
+    var ahora=new Date();
+    var mesKeyActual=ahora.getFullYear()+'-'+ahora.getMonth();
+    var rawAj=localStorage.getItem(SK_STOCK+'_aj');
+    if(rawAj) AJUSTES_STOCK=JSON.parse(rawAj);
+    var rawMes=localStorage.getItem(SK_STOCK+'_mes');
+    if(rawMes){
+      var dm=JSON.parse(rawMes);
+      if(dm.key===mesKeyActual && dm.ini){
+        STOCK_MES_INICIAL=dm.ini;
+      } else {
+        // Nuevo mes: tomar snapshot del stock actual
+        STOCK_MES_INICIAL={};
+        Object.keys(STOCK).forEach(function(k){STOCK_MES_INICIAL[k]=(STOCK[k]&&STOCK[k].qty)||0;});
+      }
+    } else {
+      // Primera vez: tomar snapshot del stock actual
+      STOCK_MES_INICIAL={};
+      Object.keys(STOCK).forEach(function(k){STOCK_MES_INICIAL[k]=(STOCK[k]&&STOCK[k].qty)||0;});
+    }
+  }catch(e){}
+  // Init suministros sin stock
+  SUMINISTROS.forEach(function(s){
+    if(!STOCK[s.id]) STOCK[s.id]={qty:STOCK_INICIAL[s.id]||0,min:2,movs:[]};
+  });
+}
+
+function save(){
+  try{
+    localStorage.setItem(SK_PED, JSON.stringify(PEDIDOS));
+    localStorage.setItem(SK_STOCK, JSON.stringify(STOCK));
+    var ahora=new Date();
+    var mesKey=ahora.getFullYear()+'-'+ahora.getMonth();
+    localStorage.setItem(SK_STOCK+'_mes', JSON.stringify({ini:STOCK_MES_INICIAL,key:mesKey}));
+    localStorage.setItem(SK_STOCK+'_aj', JSON.stringify(AJUSTES_STOCK));
+  }catch(e){}
+}
+
+// ── TABS ──
+function goTab(n){
+  for(var i=0;i<6;i++){
+    var tb=document.getElementById('tab'+i);
+    var pl=document.getElementById('pnl'+i);
+    if(tb) tb.className='tab'+(i===n?' on':'');
+    if(pl) pl.className='pnl'+(i===n?' on':'');
+  }
+  if(n===1) renderPedidos();
+  if(n===2) renderStock();
+  if(n===3) renderHistorial();
+  if(n===4) renderCompras();
+  if(n===5) renderGastos();
+}
+
+// ── PARSEAR MENSAJE WA ──
+function parsearMensaje(txt){
+  var p={fecha:'',hora:'',sector:'',solicitante:'',items:[],otros:''};
+  var lineas=txt.split('\n').map(function(l){return l.trim();});
+  var enItems=false;
+
+  lineas.forEach(function(l){
+    if(!l) return;
+    var lClean=l.replace(/\*/g,'').trim();
+    if(lClean.startsWith('Fecha:'))      p.fecha=lClean.replace('Fecha:','').trim();
+    if(lClean.startsWith('Hora:'))       p.hora=lClean.replace('Hora:','').trim();
+    if(lClean.startsWith('Sector:'))     p.sector=lClean.replace('Sector:','').trim();
+    if(lClean.startsWith('Solicitante:'))p.solicitante=lClean.replace('Solicitante:','').trim();
+    if(lClean.includes('Suministros solicitados')) enItems=true;
+    // Resetear enItems si encontramos una nueva sección de Fecha (nuevo pedido dentro del mismo bloque)
+    if(enItems && lClean.startsWith('Fecha:') && p.items.length>0) enItems=false;
+    if(lClean.startsWith('Otros:'))      p.otros=lClean.replace('Otros:','').trim();
+    if(enItems && lClean.startsWith('-')){
+      // Formato: "- Nombre del item: x2"
+      var m=lClean.match(/^-\s*(.+?):\s*x(\d+)/i);
+      if(m){
+        var nom=m[1].trim();
+        var qty=parseInt(m[2])||1;
+        // Buscar el suministro
+        var s=matchSuministro(nom);
+        p.items.push({nom:nom,qty:qty,sid:s?s.id:null,nomMatch:s?s.nom:null});
+      }
+    }
+  });
+  return p;
+}
+
+function normTexto(s){
+  return (s||'').toString().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+}
+
+// Busca si ya hay un pedido registrado con el mismo solicitante+sector+fecha \u2014
+// se usa en el preview para avisar antes de confirmar y evitar cargar el mismo pedido dos veces.
+function buscarPosibleDuplicado(p){
+  if(!normTexto(p.solicitante)) return null;
+  return PEDIDOS.find(function(ex){
+    return normTexto(ex.solicitante)===normTexto(p.solicitante) &&
+           normTexto(ex.sector)===normTexto(p.sector) &&
+           (ex.fecha||'')===(p.fecha||'');
+  })||null;
+}
+
+function matchSuministro(nom){
+  var nl=normTexto(nom);
+  // Exacto (ignorando acentos, mayúsculas y espacios extra)
+  var ex=SUMINISTROS.find(function(s){return normTexto(s.nom)===nl;});
+  if(ex) return ex;
+  // Parcial — buscar las primeras palabras significativas
+  var palabras=nl.split(' ').filter(function(w){return w.length>3;}).slice(0,3);
+  return SUMINISTROS.find(function(s){
+    var sn=normTexto(s.nom);
+    return palabras.every(function(w){return sn.includes(w);});
+  })||null;
+}
+
+// ── PROCESAR MENSAJE ──
+var pedidosTemp = []; // ahora es un array
+
+function dividirMensajes(txt){
+  // Limpiar encabezados de WhatsApp (ej: "[dd/mm/yyyy, hh:mm:ss] Nombre:")
+  var limpio = txt.replace(/\[\d{1,2}\/\d{1,2}\/\d{2,4},?\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?\]\s*[^:]+:/g, '\n');
+  // También limpiar formato "dd/mm/yyyy, hh:mm - Nombre:"
+  limpio = limpio.replace(/\d{1,2}\/\d{1,2}\/\d{2,4},\s*\d{1,2}:\d{2}\s*[-–]\s*[^:]+:/g, '\n');
+
+  // Separar por línea de guiones seguida de Fecha: (formato nuevo sin encabezado PEDIDO)
+  // También soporta el formato con *PEDIDO DE SUMINISTROS*
+  var partes;
+  if(limpio.includes('PEDIDO DE SUMINISTROS')){
+    partes = limpio.split(/(?=\*?PEDIDO DE SUMINISTROS)/);
+  } else {
+    // Separar donde hay una línea de guiones (---) seguida de Fecha:
+    partes = limpio.split(/(?=[-]{3,}[\s\S]{0,5}\nFecha:)/);
+    // Si no separó bien, intentar separar directamente por Fecha: precedida de salto de línea
+    if(partes.length<=1){
+      partes = limpio.split(/(?=\nFecha:)/);
+    }
+  }
+  return partes.map(function(p){return p.trim();}).filter(function(p){return p.length>10 && p.includes('Sector:');});
+}
+
+function procesarMensaje(){
+  var txt=document.getElementById('waMsg').value.trim();
+  if(!txt){document.getElementById('procStatus').textContent='⚠ Pegá el mensaje primero';return;}
+
+  var partes = dividirMensajes(txt);
+  if(!partes.length) partes=[txt];
+
+  pedidosTemp = partes.map(parsearMensaje).filter(function(p){
+    return p.solicitante||p.items.length;
+  });
+
+  if(!pedidosTemp.length){
+    document.getElementById('procStatus').textContent='⚠ No se pudo leer el mensaje. Verificá el formato.';
+    return;
+  }
+
+  // Mostrar preview de todos los pedidos
+  var html='';
+  if(pedidosTemp.length>1){
+    html+='<div style="background:var(--gn2);color:var(--gn);border-radius:8px;padding:10px 14px;font-size:13px;font-weight:700;margin-bottom:14px">'+
+      '✓ Se detectaron '+pedidosTemp.length+' pedidos</div>';
+  }
+
+  pedidosTemp.forEach(function(p, idx){
+    var dup=buscarPosibleDuplicado(p);
+    html+='<div style="border:1.5px solid '+(dup?'var(--rd)':'var(--br)')+';border-radius:10px;padding:14px;margin-bottom:12px'+(dup?';background:var(--rd2)':'')+'">';
+    if(pedidosTemp.length>1) html+='<div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;margin-bottom:10px">Pedido '+(idx+1)+'</div>';
+    if(dup) html+='<div style="background:#fff;border:1px solid var(--rd);border-radius:8px;padding:8px 10px;margin-bottom:12px;font-size:11.5px;color:var(--rd);font-weight:700">⚠ Ya hay un pedido cargado el '+esc(dup.fecha)+' para '+esc(dup.solicitante)+' · '+esc(dup.sector)+' — revisá que no sea el mismo antes de confirmar.</div>';
+    html+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">';
+    html+='<div><div style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;margin-bottom:2px">Solicitante</div><div style="font-size:13px;font-weight:700">'+esc(p.solicitante)+'</div></div>';
+    html+='<div><div style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;margin-bottom:2px">Sector</div><div style="font-size:12px;font-weight:600">'+esc(p.sector)+'</div></div>';
+    html+='<div><div style="font-size:10px;color:var(--mu);font-weight:600;text-transform:uppercase;margin-bottom:2px">Fecha</div><div style="font-size:12px">'+esc(p.fecha)+' '+esc(p.hora)+'</div></div>';
+    html+='</div>';
+    p.items.forEach(function(it){
+      var matched=it.sid!==null;
+      html+='<div style="display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px solid var(--br)">'+
+        '<div>'+
+          '<div style="font-size:12px;font-weight:600;color:'+(matched?'var(--tx)':'var(--rd)')+'">'+esc(it.nom)+'</div>'+
+          (matched?'<div style="font-size:10px;color:var(--gn)">✓ '+esc(it.nomMatch)+'</div>':'<div style="font-size:10px;color:var(--rd)">⚠ No encontrado</div>')+
+        '</div>'+
+        '<span style="font-family:Space Mono,monospace;font-weight:700;color:var(--ac);font-size:13px">×'+it.qty+'</span>'+
+      '</div>';
+    });
+    if(p.otros) html+='<div style="padding:6px 0;font-size:11px;color:var(--mu)">✏️ '+esc(p.otros)+'</div>';
+    html+='</div>';
+  });
+
+  document.getElementById('previewBody').innerHTML=html;
+  document.getElementById('previewDiv').style.display='block';
+  document.getElementById('procStatus').textContent='';
+}
+
+function cancelarPreview(){
+  pedidosTemp=[];
+  document.getElementById('previewDiv').style.display='none';
+}
+
+// Descuenta del stock físico los ítems de un pedido y deja registro del movimiento.
+// Se usa tanto al registrar el pedido (descuento automático) como, por compatibilidad,
+// desde confirmarEntrega() para pedidos pendientes que hayan quedado de antes de este cambio.
+function descontarStockPedido(p, fechaStr, horaStr, nota){
+  p.items.forEach(function(it){
+    if(!it.sid) return;
+    if(!STOCK[it.sid]) STOCK[it.sid]={qty:0,min:2,movs:[]};
+    if(!STOCK[it.sid].movs) STOCK[it.sid].movs=[];
+    var sumItem=SUMINISTROS.find(function(x){return x.id===it.sid;});
+    var mult=sumItem&&sumItem.mult?sumItem.mult:1;
+    var cantReal=it.qty*mult;
+    STOCK[it.sid].qty=Math.max(0,STOCK[it.sid].qty-cantReal);
+    STOCK[it.sid].movs.unshift({
+      tipo:'salida',qty:cantReal,
+      fecha:fechaStr,
+      hora:horaStr,
+      nota:nota||('Entrega: '+p.solicitante+' · '+p.sector)
+    });
+  });
+}
+
+// Revierte el descuento de stock de un pedido ya entregado (se usa al anular/rechazar).
+function restaurarStockPedido(p){
+  p.items.forEach(function(it){
+    if(!it.sid) return;
+    if(!STOCK[it.sid]) STOCK[it.sid]={qty:0,min:2,movs:[]};
+    if(!STOCK[it.sid].movs) STOCK[it.sid].movs=[];
+    var sumItem=SUMINISTROS.find(function(x){return x.id===it.sid;});
+    var mult=sumItem&&sumItem.mult?sumItem.mult:1;
+    var cantReal=it.qty*mult;
+    STOCK[it.sid].qty+=cantReal;
+    STOCK[it.sid].movs.unshift({
+      tipo:'entrada',qty:cantReal,
+      fecha:('0'+new Date().getDate()).slice(-2)+'/'+('0'+(new Date().getMonth()+1)).slice(-2)+'/'+new Date().getFullYear(),
+      hora:('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2),
+      nota:'Anulación de pedido: '+p.solicitante+' · '+p.sector
+    });
+  });
+}
+
+function confirmarPedido(){
+  if(!pedidosTemp.length) return;
+  var ahora=Date.now();
+  var hoy=new Date();
+  var fechaHoyStr=('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
+  var horaHoyStr=('0'+hoy.getHours()).slice(-2)+':'+('0'+hoy.getMinutes()).slice(-2);
+  pedidosTemp.forEach(function(p, idx){
+    var nuevo={
+      id: ahora+idx,
+      fecha:p.fecha, hora:p.hora,
+      sector:p.sector, solicitante:p.solicitante,
+      items:p.items, otros:p.otros,
+      entregado:true, fechaEntrega:fechaHoyStr
+    };
+    // Descuento automático de stock al registrar el pedido — ya no depende de un
+    // paso manual aparte de "Confirmar entrega".
+    descontarStockPedido(nuevo, fechaHoyStr, horaHoyStr);
+    PEDIDOS.unshift(nuevo);
+  });
+  var cant=pedidosTemp.length;
+  save();
+  pedidosTemp=[];
+  document.getElementById('previewDiv').style.display='none';
+  document.getElementById('waMsg').value='';
+  actualizarBadge();
+  renderStock();
+  goTab(1);
+  showToast('✓ '+cant+' pedido'+(cant>1?'s':'')+' registrado'+(cant>1?'s':'')+' — stock descontado automáticamente');
+}
+
+// ── RENDER PEDIDOS ──
+function renderPedidos(){
+  var filtroSec=document.getElementById('filtroSector').value;
+
+  // Poblar sectores únicos
+  var sectores=[...new Set(PEDIDOS.map(function(p){return p.sector;}))].sort();
+  var sel=document.getElementById('filtroSector');
+  var valSec=sel.value;
+  sel.innerHTML='<option value="">Todos los sectores</option>';
+  sectores.forEach(function(s){
+    var o=document.createElement('option');
+    o.value=s; o.textContent=s;
+    if(s===valSec) o.selected=true;
+    sel.appendChild(o);
+  });
+
+  var ahoraPed=new Date();
+  var hoyPedStr=('0'+ahoraPed.getDate()).slice(-2)+'/'+('0'+(ahoraPed.getMonth()+1)).slice(-2)+'/'+ahoraPed.getFullYear();
+
+  // Pendientes "legacy": pedidos que hayan quedado sin confirmar de antes de activar el
+  // descuento automático de stock. Con el flujo nuevo, todo pedido se registra ya entregado,
+  // así que en general esta lista debería estar vacía.
+  var pendientes=PEDIDOS.filter(function(p){
+    if(p.entregado) return false;
+    if(filtroSec && p.sector!==filtroSec) return false;
+    return true;
+  });
+  // Entregados de hoy: se muestran para poder anular (y restaurar stock) si algo se cargó mal.
+  var entregadosHoy=PEDIDOS.filter(function(p){
+    if(!p.entregado || p.fechaEntrega!==hoyPedStr) return false;
+    if(filtroSec && p.sector!==filtroSec) return false;
+    return true;
+  });
+  var items=pendientes.concat(entregadosHoy);
+
+  // Stats
+  var pend=PEDIDOS.filter(function(p){return !p.entregado;}).length;
+  var done=PEDIDOS.filter(function(p){return p.entregado;}).length;
+  var pers=[...new Set(PEDIDOS.map(function(p){return p.solicitante;}))].length;
+  document.getElementById('stTotal').textContent=PEDIDOS.length;
+  document.getElementById('stPend').textContent=pend;
+  document.getElementById('stDone').textContent=done;
+  document.getElementById('stPersonas').textContent=pers;
+
+  var body=document.getElementById('pedidosBody');
+  if(!items.length){
+    body.innerHTML='<div class="empty"><div class="ico">📋</div>No hay pedidos registrados hoy</div>';
+    return;
+  }
+
+  body.innerHTML=items.map(function(p){
+    var itemsHtml=p.items.map(function(it){
+      return '<div class="ped-row"><span>'+esc(it.nom)+'</span><span class="ped-qty">×'+it.qty+'</span></div>';
+    }).join('');
+    var badge=p.entregado
+      ?'<span class="badge-done">✅ Entregado — stock descontado</span>'
+      :'<span class="badge-pend">⏳ Pendiente</span>';
+    var btn;
+    if(!p.entregado){
+      btn='<div style="display:flex;gap:8px;margin-top:10px">'+
+        '<button onclick="confirmarEntrega('+p.id+')" style="flex:1;background:var(--gn);color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">✓ Confirmar entrega</button>'+
+        '<button onclick="rechazarPedido('+p.id+')" style="background:#fdecea;color:var(--rd);border:1.5px solid #fca5a5;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer">✕ Rechazar</button>'+
+        '</div>';
+    } else {
+      btn='<div style="font-size:11px;color:var(--mu);margin-top:8px">Entregado automáticamente el '+esc(p.fechaEntrega)+'</div>'+
+        '<div style="margin-top:8px">'+
+        '<button onclick="rechazarPedido('+p.id+')" style="background:#fdecea;color:var(--rd);border:1.5px solid #fca5a5;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">↩ Anular (restaura stock)</button>'+
+        '</div>';
+    }
+    return '<div class="ped-card'+(p.entregado?' entregado':'')+'">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px">'+
+        '<div><div class="ped-nom">'+esc(p.solicitante)+'</div><div class="ped-sub">📍 '+esc(p.sector)+' · '+esc(p.fecha)+' '+esc(p.hora)+'</div></div>'+
+        badge+
+      '</div>'+
+      '<div class="ped-items">'+itemsHtml+'</div>'+
+      (p.otros?'<div style="font-size:12px;color:var(--mu);margin-top:6px">✏️ '+esc(p.otros)+'</div>':'')+
+      btn+
+    '</div>';
+  }).join('');
+}
+
+function rechazarPedido(id){
+  var p=PEDIDOS.find(function(x){return String(x.id)===String(id);});
+  if(!p) return;
+  if(p.entregado){
+    // El pedido ya había descontado stock automáticamente al registrarse: al anularlo,
+    // se lo devuelve para que el saldo quede correcto.
+    if(!confirm('¿Anular este pedido?\nSe va a restaurar el stock que se descontó al registrarlo.')) return;
+    restaurarStockPedido(p);
+    PEDIDOS=PEDIDOS.filter(function(x){return String(x.id)!==String(id);});
+    save(); renderPedidos(); actualizarBadge(); renderStock();
+    showToast('✓ Pedido anulado — stock restaurado');
+  } else {
+    if(!confirm('¿Rechazar y eliminar este pedido?\nEsto NO afecta el stock.')) return;
+    PEDIDOS=PEDIDOS.filter(function(x){return String(x.id)!==String(id);});
+    save(); renderPedidos(); actualizarBadge();
+    showToast('Pedido eliminado');
+  }
+}
+
+// Se conserva por compatibilidad: si quedó algún pedido pendiente de antes de activar
+// el descuento automático, esto permite confirmarlo igual que antes.
+function confirmarEntrega(id){
+  var p=PEDIDOS.find(function(x){return String(x.id)===String(id);});
+  if(!p||p.entregado) return;
+  if(!confirm('¿Confirmar entrega y descontar del stock?')) return;
+  var hoy=new Date();
+  var fechaHoyStr=('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
+  var horaHoyStr=('0'+hoy.getHours()).slice(-2)+':'+('0'+hoy.getMinutes()).slice(-2);
+  descontarStockPedido(p, fechaHoyStr, horaHoyStr);
+  p.entregado=true;
+  p.fechaEntrega=fechaHoyStr;
+  save(); renderPedidos(); actualizarBadge(); renderStock();
+  showToast('✓ Entrega confirmada — stock descontado');
+}
+
+// ── RENDER STOCK ──
+function renderStock(){
+  var grid=document.getElementById('stockGrid');
+  var ahora=new Date();
+
+  // Saldo = stock físico actual (ya descontado al procesar cada pedido)
+
+  // Evento para botones ajustar
+  var grid2=document.getElementById('stockGrid');
+  if(grid2&&!grid2._ajusteEvt){
+    grid2.addEventListener('click',function(e){
+      var btn=e.target.closest('.btn-ajustar-stock');
+      if(btn) ajustarStock(btn.getAttribute('data-sid'));
+      var btn2=e.target.closest('.btn-ingreso-stock');
+      if(btn2) registrarIngreso(btn2.getAttribute('data-sid'));
+      var btn3=e.target.closest('.btn-baja-stock');
+      if(btn3) darDeBaja(btn3.getAttribute('data-sid'));
+      var btn4=e.target.closest('.btn-alta-stock');
+      if(btn4) darDeAlta(btn4.getAttribute('data-sid'));
+    });
+    grid2._ajusteEvt=true;
+  }
+  var hoyStr=('0'+ahora.getDate()).slice(-2)+'/'+('0'+(ahora.getMonth()+1)).slice(-2)+'/'+ahora.getFullYear();
+  grid.innerHTML=SUMINISTROS.map(function(s){
+    var st=STOCK[s.id]||{qty:0,min:2};
+    var saldo=st.qty;  // Saldo restante = stock físico actual (cierre, ya descontadas las entregas de hoy)
+
+    // Pedido del día = entregas confirmadas hoy (movs tipo 'salida' con fecha de hoy)
+    var movs=st.movs||[];
+    var salidaHoy=movs.filter(function(m){return m.tipo==='salida'&&m.fecha===hoyStr;}).reduce(function(a,m){return a+m.qty;},0);
+    // Ingresos de compra de hoy — pueden venir del botón "➕ Ingreso" por tarjeta (AJUSTES_STOCK, tipo 'ingreso')
+    // o del botón "+ Ingreso de compra" del encabezado (STOCK.movs, tipo 'entrada'). Sumamos ambas fuentes.
+    var entradaHoyMovs=movs.filter(function(m){return m.tipo==='entrada'&&m.fecha===hoyStr;}).reduce(function(a,m){return a+m.qty;},0);
+    var ajustesHoy=(AJUSTES_STOCK[s.id]||[]).filter(function(a){return a.fecha===hoyStr&&a.tipo==='ingreso';});
+    var ingresoHoy=entradaHoyMovs+ajustesHoy.reduce(function(a,x){return a+(x.cantidad||0);},0);
+
+    // Stock a la fecha = saldo actual + entregas de hoy (para volver a "antes de entregar"),
+    // SIN restar los ingresos de compra de hoy — así la compra ya queda reflejada acá apenas se carga.
+    var stockFecha=saldo+salidaHoy;
+    var pedidoDia=salidaHoy;
+
+    var baja=!esActivo(s.id);
+    var cls=saldo<=0?'sin':saldo<=st.min?'bajo':'';
+    var dot=saldo<=0?'🔴 Sin stock':saldo<=st.min?'🟡 Stock bajo':'🟢 OK';
+    var saldoColor=saldo<=0?'#c0392b':saldo<=st.min?'#92400e':'var(--gn)';
+    var border=saldo<=0?'border-color:#fca5a5':saldo<=st.min?'border-color:#fcd34d':'';
+    return '<div class="stock-item '+cls+'" style="'+border+(baja?';opacity:.55':'')+'">'+
+      '<div class="stock-nom">'+esc(s.nom)+(baja?' <span style="background:var(--rd2);color:var(--rd);font-size:9px;font-weight:700;padding:1px 6px;border-radius:4px;margin-left:4px">DE BAJA</span>':'')+'</div>'+
+      '<div style="display:flex;justify-content:space-between;gap:6px;margin:8px 0">'+
+        '<div style="text-align:center;flex:1">'+
+          '<div style="font-size:9px;color:var(--mu);text-transform:uppercase;margin-bottom:3px">Stock a la fecha</div>'+
+          '<div style="font-size:18px;font-weight:700;color:var(--mu)">'+stockFecha+'</div>'+
+        '</div>'+
+        '<div style="width:1px;background:var(--br)"></div>'+
+        '<div style="text-align:center;flex:1">'+
+          '<div style="font-size:9px;color:var(--mu);text-transform:uppercase;margin-bottom:3px">Pedido del día</div>'+
+          '<div style="font-size:18px;font-weight:700;color:var(--yl)">'+( pedidoDia>0?pedidoDia:'—')+'</div>'+
+        '</div>'+
+        '<div style="width:1px;background:var(--br)"></div>'+
+        '<div style="text-align:center;flex:1">'+
+          '<div style="font-size:9px;color:var(--mu);text-transform:uppercase;margin-bottom:3px">Saldo restante</div>'+
+          '<div style="font-size:18px;font-weight:700;color:'+saldoColor+'">'+saldo+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div class="stock-dot">'+dot+'</div>'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;padding-top:6px;border-top:1px solid var(--br)">'+
+        '<div style="font-size:9px;color:var(--mu)">'+
+          (AJUSTES_STOCK[s.id]&&AJUSTES_STOCK[s.id].length?
+            'Conteo: '+AJUSTES_STOCK[s.id][AJUSTES_STOCK[s.id].length-1].fecha:
+            'Sin conteo registrado')+
+        '</div>'+
+        '<div style="display:flex;gap:6px">'+
+        (baja?
+          '<button class="btn-alta-stock" data-sid="'+s.id+'" style="background:#2e7d32;border:none;border-radius:5px;padding:2px 8px;font-size:9px;cursor:pointer;color:#fff;font-weight:600">↩ Dar de alta</button>'
+          :
+          '<button class="btn-ingreso-stock" data-sid="'+s.id+'" style="background:#2e7d32;border:none;border-radius:5px;padding:2px 8px;font-size:9px;cursor:pointer;color:#fff;font-weight:600">➕ Ingreso</button>'+
+          '<button class="btn-ajustar-stock" data-sid="'+s.id+'" style="background:none;border:0.5px solid var(--br);border-radius:5px;padding:2px 8px;font-size:9px;cursor:pointer;color:var(--tx)">✏️ Ajustar</button>'+
+          '<button class="btn-baja-stock" data-sid="'+s.id+'" style="background:none;border:0.5px solid var(--br);border-radius:5px;padding:2px 8px;font-size:9px;cursor:pointer;color:var(--rd)">⛔ Baja</button>'
+        )+
+        '</div>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+}
+
+// ── INGRESO DE COMPRA ──
+function registrarIngreso(sid){
+  var s=SUMINISTROS.find(function(x){return x.id===sid;});
+  if(!s) return;
+  var st=STOCK[sid]||{qty:0};
+
+  var viejo=document.getElementById('_modalIngreso'); if(viejo) viejo.remove();
+  var modal=document.createElement('div');
+  modal.id='_modalIngreso';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center';
+
+  modal.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:340px;max-width:95vw">'+
+    '<div style="font-size:14px;font-weight:700;margin-bottom:4px">➕ Registrar ingreso de compra</div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:16px">'+esc(s.nom)+'</div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:6px">Stock actual: <strong>'+st.qty+'</strong></div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Cantidad recibida:</div>'+
+    '<input type="number" id="_inpIngreso" min="1" value="" placeholder="Ej: 50" style="width:100%;padding:10px;border:1.5px solid var(--br);border-radius:8px;font-size:16px;margin-bottom:6px;box-sizing:border-box">'+
+    '<div id="_previewIngreso" style="font-size:11px;color:#2e7d32;margin-bottom:14px;min-height:16px"></div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button id="_btnConfIngreso" style="flex:1;padding:10px;background:#2e7d32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✓ Confirmar ingreso</button>'+
+      '<button id="_btnCancelIngreso" style="flex:1;padding:10px;background:none;border:1px solid var(--br);border-radius:8px;cursor:pointer">Cancelar</button>'+
+    '</div>'+
+  '</div>';
+
+  document.body.appendChild(modal);
+  var inp=document.getElementById('_inpIngreso');
+  var preview=document.getElementById('_previewIngreso');
+  inp.focus();
+
+  inp.addEventListener('input',function(){
+    var cant=parseInt(inp.value)||0;
+    if(cant>0){
+      preview.textContent='Nuevo stock: '+(st.qty+cant);
+    } else {
+      preview.textContent='';
+    }
+  });
+
+  document.getElementById('_btnCancelIngreso').onclick=function(){modal.remove();};
+  document.getElementById('_btnConfIngreso').onclick=function(){
+    var cant=parseInt(inp.value);
+    if(!cant||cant<=0){showToast('Ingresá una cantidad válida','err');return;}
+    // Sumar al stock físico
+    if(!STOCK[sid]) STOCK[sid]={qty:0,min:s.min||2};
+    STOCK[sid].qty+=cant;
+    // Guardar historial de ingreso en AJUSTES_STOCK con tipo 'ingreso'
+    if(!AJUSTES_STOCK[sid]) AJUSTES_STOCK[sid]=[];
+    var hoy=new Date();
+    var fechaStr=('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
+    AJUSTES_STOCK[sid].push({fecha:fechaStr,qty:STOCK[sid].qty,anterior:st.qty,tipo:'ingreso',cantidad:cant});
+    save();
+    modal.remove();
+    renderStock();
+    showToast('✓ Ingreso de '+cant+' unidades registrado. Nuevo stock: '+STOCK[sid].qty);
+  };
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter') document.getElementById('_btnConfIngreso').click();});
+}
+
+// ── NUEVO SUMINISTRO ──
+function abrirModalNuevoSuministro(){
+  var viejo=document.getElementById('_modalNuevoSum'); if(viejo) viejo.remove();
+  var modal=document.createElement('div');
+  modal.id='_modalNuevoSum';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:360px;max-width:95vw">'+
+    '<div style="font-size:14px;font-weight:700;margin-bottom:16px">➕ Agregar suministro</div>'+
+    '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px">'+
+      '<div>'+
+        '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Nombre del suministro *</div>'+
+        '<input type="text" id="_inpNomSum" placeholder="Ej: Té en saquitos x 100" style="width:100%;padding:9px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;box-sizing:border-box">'+
+      '</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<div style="flex:1">'+
+          '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Stock inicial</div>'+
+          '<input type="number" id="_inpStockSum" min="0" value="0" style="width:100%;padding:9px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;box-sizing:border-box">'+
+        '</div>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Precio unitario</div>'+
+          '<input type="number" id="_inpPrecioSum" min="0" value="0" style="width:100%;padding:9px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;box-sizing:border-box">'+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px">'+
+        '<div style="flex:1">'+
+          '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Stock mínimo</div>'+
+          '<input type="number" id="_inpMinSum" min="0" value="0" style="width:100%;padding:9px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;box-sizing:border-box">'+
+        '</div>'+
+        '<div style="flex:1">'+
+          '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Stock máximo</div>'+
+          '<input type="number" id="_inpMaxSum" min="0" value="0" style="width:100%;padding:9px;border:1.5px solid var(--br);border-radius:8px;font-size:13px;box-sizing:border-box">'+
+        '</div>'+
+      '</div>'+
+    '</div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button id="_btnConfNuevoSum" style="flex:1;padding:10px;background:#2e7d32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✓ Agregar</button>'+
+      '<button id="_btnCancelNuevoSum" style="flex:1;padding:10px;background:none;border:1px solid var(--br);border-radius:8px;cursor:pointer">Cancelar</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(modal);
+  document.getElementById('_inpNomSum').focus();
+
+  document.getElementById('_btnCancelNuevoSum').onclick=function(){modal.remove();};
+  document.getElementById('_btnConfNuevoSum').onclick=function(){
+    var nom=document.getElementById('_inpNomSum').value.trim();
+    var qty=parseInt(document.getElementById('_inpStockSum').value)||0;
+    var precio=parseFloat(document.getElementById('_inpPrecioSum').value)||0;
+    var min=parseInt(document.getElementById('_inpMinSum').value)||0;
+    var max=parseInt(document.getElementById('_inpMaxSum').value)||0;
+    if(!nom){showToast('Ingresá el nombre del suministro','err');return;}
+    // Generar ID único
+    var nuevoId='s'+( SUMINISTROS.length+1).toString().padStart(2,'0')+'_'+Date.now();
+    SUMINISTROS.push({id:nuevoId,nom:nom,precio:precio,min:min,max:max});
+    STOCK[nuevoId]={qty:qty,min:min,max:max};
+    if(qty>0){
+      STOCK_MES_INICIAL[nuevoId]=qty;
+      if(!AJUSTES_STOCK[nuevoId]) AJUSTES_STOCK[nuevoId]=[];
+      var hoy=new Date();
+      var fechaStr=('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
+      AJUSTES_STOCK[nuevoId].push({fecha:fechaStr,qty:qty,anterior:0});
+    }
+    save();
+    modal.remove();
+    renderStock();
+    showToast('✓ Suministro "'+nom+'" agregado');
+  };
+}
+
+// ── AJUSTE DE INVENTARIO ──
+function ajustarStock(sid){
+  var s=SUMINISTROS.find(function(x){return x.id===sid;});
+  var st=STOCK[sid]||{qty:0};
+  var historial=AJUSTES_STOCK[sid]||[];
+
+  var viejo=document.getElementById('_modalAjuste'); if(viejo) viejo.remove();
+  var modal=document.createElement('div');
+  modal.id='_modalAjuste';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center';
+
+  var histHtml=historial.length?
+    '<div style="margin-bottom:12px">'+
+      '<div style="font-size:10px;font-weight:700;color:var(--mu);text-transform:uppercase;margin-bottom:6px">Historial de conteos</div>'+
+      historial.slice(-3).reverse().map(function(h){
+        return '<div style="display:flex;justify-content:space-between;font-size:11px;padding:3px 0;border-bottom:0.5px solid var(--br)">'+
+          '<span style="color:var(--mu)">'+h.fecha+'</span>'+
+          '<span>'+h.anterior+' → <strong>'+h.qty+'</strong></span>'+
+        '</div>';
+      }).join('')+
+    '</div>':'';
+
+  modal.innerHTML='<div style="background:#fff;border-radius:14px;padding:24px;width:340px;max-width:95vw">'+
+    '<div style="font-size:14px;font-weight:700;margin-bottom:4px">✏️ Ajustar inventario</div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:16px">'+esc(s.nom)+'</div>'+
+    histHtml+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:6px">Stock actual: <strong>'+st.qty+'</strong></div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:4px">Nuevo stock contado:</div>'+
+    '<input type="number" id="_inpAjuste" min="0" value="'+st.qty+'" style="width:100%;padding:10px;border:1.5px solid var(--br);border-radius:8px;font-size:16px;margin-bottom:16px;box-sizing:border-box">'+
+    '<div style="display:flex;gap:8px">'+
+      '<button id="_btnConfAjuste" style="flex:1;padding:10px;background:#2e7d32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✓ Guardar conteo</button>'+
+      '<button id="_btnCancelAjuste" style="flex:1;padding:10px;background:none;border:1px solid var(--br);border-radius:8px;cursor:pointer">Cancelar</button>'+
+    '</div>'+
+  '</div>';
+
+  document.body.appendChild(modal);
+  var inp=document.getElementById('_inpAjuste');
+  inp.focus(); inp.select();
+
+  document.getElementById('_btnCancelAjuste').onclick=function(){modal.remove();};
+  document.getElementById('_btnConfAjuste').onclick=function(){
+    var nuevo=parseInt(inp.value);
+    if(isNaN(nuevo)||nuevo<0){showToast('Cantidad inválida','err');return;}
+    var anterior=st.qty;
+    // Actualizar stock y stock inicial del mes (el ajuste es el nuevo punto de partida)
+    if(!STOCK[sid]) STOCK[sid]={qty:0,min:s.min,max:s.max};
+    STOCK[sid].qty=nuevo;
+    STOCK_MES_INICIAL[sid]=nuevo;  // El ajuste reemplaza el stock inicial
+    // Registrar ajuste con fecha
+    if(!AJUSTES_STOCK[sid]) AJUSTES_STOCK[sid]=[];
+    var hoy=new Date();
+    var fechaStr=('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
+    AJUSTES_STOCK[sid].push({fecha:fechaStr,qty:nuevo,anterior:anterior,ts:hoy.getTime()});
+    save();
+    modal.remove();
+    renderStock();
+    showToast('✓ Stock ajustado a '+nuevo+' — '+fechaStr);
+  };
+  inp.addEventListener('keydown',function(e){if(e.key==='Enter') document.getElementById('_btnConfAjuste').click();});
+}
+
+// ── INGRESO DE COMPRA ──
+function abrirIngreso(){
+  var opts=SUMINISTROS.filter(function(s){return esActivo(s.id);}).map(function(s){return '<option value="'+s.id+'">'+esc(s.nom)+'</option>';}).join('');
+  var d=crearModal(
+    '+ Ingreso de compra',
+    '<label style="font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;display:block;margin-bottom:4px">Suministro</label>'+
+    '<select id="ing_s" class="inp" style="margin-bottom:12px">'+opts+'</select>'+
+    '<label style="font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;display:block;margin-bottom:4px">Cantidad recibida</label>'+
+    '<input type="number" id="ing_q" min="1" value="1" class="inp" style="font-size:18px;font-weight:700;margin-bottom:12px">'+
+    '<label style="font-size:11px;font-weight:600;color:var(--mu);text-transform:uppercase;display:block;margin-bottom:4px">Nota (opcional)</label>'+
+    '<input type="text" id="ing_n" placeholder="Ej: Factura 001-0023" class="inp" style="margin-bottom:16px">',
+    function(){
+      var id=document.getElementById('ing_s').value;
+      var qty=parseInt(document.getElementById('ing_q').value)||0;
+      var nota=document.getElementById('ing_n').value.trim();
+      if(!qty||qty<1){alert('Ingresá una cantidad válida');return false;}
+      if(!STOCK[id]) STOCK[id]={qty:0,min:2,movs:[]};
+      if(!STOCK[id].movs) STOCK[id].movs=[];
+      STOCK[id].qty+=qty;
+      var hoyIng=new Date();
+      var fechaIngStr=('0'+hoyIng.getDate()).slice(-2)+'/'+('0'+(hoyIng.getMonth()+1)).slice(-2)+'/'+hoyIng.getFullYear();
+      var horaIngStr=('0'+hoyIng.getHours()).slice(-2)+':'+('0'+hoyIng.getMinutes()).slice(-2);
+      STOCK[id].movs.unshift({tipo:'entrada',qty:qty,
+        fecha:fechaIngStr,
+        hora:horaIngStr,
+        nota:nota||'Ingreso de compra'});
+      save(); renderStock();
+      showToast('✓ Stock actualizado');
+      return true;
+    }
+  );
+}
+
+// ── EDITAR STOCK ──
+function abrirCargaExcel(){
+  var d=document.createElement('div');
+  d.className='modal-bg';
+  var box=document.createElement('div');
+  box.className='modal';
+  box.innerHTML='<h3>📊 Cargar stock desde Excel</h3>'+
+    '<p style="font-size:12px;color:var(--mu);margin-bottom:14px">El Excel debe tener la hoja <strong>Suministros y stock</strong> con el nombre en col B y el stock en col C.</p>'+
+    '<input type="file" id="xlsInp" accept=".xlsx,.xls" style="width:100%;margin-bottom:10px;font-size:13px">'+
+    '<div id="xlsMsg" style="font-size:12px;color:var(--mu);margin-bottom:12px;min-height:16px"></div>'+
+    '<div style="display:flex;gap:8px"></div>';
+  var btnRow=box.querySelector('div[style]');
+  var btnCancelar=document.createElement('button');
+  btnCancelar.textContent='Cancelar';
+  btnCancelar.style.cssText='flex:1;padding:11px;border:1.5px solid #ddd;border-radius:8px;background:none;font-size:13px;font-weight:600;cursor:pointer';
+  btnCancelar.onclick=function(){d.remove();};
+  var btnCargar=document.createElement('button');
+  btnCargar.textContent='Cargar';
+  btnCargar.style.cssText='flex:1;padding:11px;background:var(--ac);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer';
+  btnCargar.onclick=function(){procesarExcelStock(d);};
+  btnRow.appendChild(btnCancelar);
+  btnRow.appendChild(btnCargar);
+  d.appendChild(box);
+  document.body.appendChild(d);
+}
+
+function procesarExcelStock(btn){
+  var file=document.getElementById('xlsInp').files[0];
+  var msg=document.getElementById('xlsMsg');
+  if(!file){msg.textContent='Seleccioná un archivo primero';return;}
+  msg.textContent='Leyendo...';
+  var reader=new FileReader();
+  reader.onerror=function(){msg.textContent='Error al leer el archivo';};
+  reader.onload=function(e){
+    try{
+      var wb=XLSX.read(new Uint8Array(e.target.result),{type:'array'});
+      // Buscar hoja de suministros
+      var sheetName=wb.SheetNames[0];
+      for(var i=0;i<wb.SheetNames.length;i++){
+        if(wb.SheetNames[i].toLowerCase().indexOf('suministro')!==-1){sheetName=wb.SheetNames[i];break;}
+      }
+      var rows=XLSX.utils.sheet_to_json(wb.Sheets[sheetName],{header:1,defval:''});
+      var cargados=0;
+      var sumIdx=0;
+      rows.forEach(function(row){
+        var nom=String(row[1]||'').replace(/ /g,' ').trim();
+        var qty=parseFloat(String(row[2]||'').replace(',','.'));
+        if(!nom||nom.length<3||isNaN(qty)||qty<0) return;
+        if(SUMINISTROS[sumIdx]){
+          var s=SUMINISTROS[sumIdx];
+          if(!STOCK[s.id]) STOCK[s.id]={qty:0,min:2,movs:[]};
+          if(!STOCK[s.id].movs) STOCK[s.id].movs=[];
+          var anteriorXls=STOCK[s.id].qty;
+          var nuevoXls=Math.round(qty);
+          STOCK[s.id].qty=nuevoXls;
+          var hoyXls=new Date();
+          var fechaXlsStr=('0'+hoyXls.getDate()).slice(-2)+'/'+('0'+(hoyXls.getMonth()+1)).slice(-2)+'/'+hoyXls.getFullYear();
+          // Es un recuento/ajuste absoluto (como "Ajustar inventario"), no un ingreso incremental —
+          // así no infla 'Pedido del día' ni 'Stock a la fecha' en la solapa Stock.
+          if(!AJUSTES_STOCK[s.id]) AJUSTES_STOCK[s.id]=[];
+          AJUSTES_STOCK[s.id].push({fecha:fechaXlsStr,qty:nuevoXls,anterior:anteriorXls,ts:hoyXls.getTime(),nota:'Carga desde Excel'});
+          cargados++;
+        }
+        sumIdx++;
+      });
+      save();
+      renderStock();
+      actualizarBadge();
+      btn.closest('.modal-bg').remove();
+      showToast('✓ '+cargados+' suministros actualizados desde Excel');
+    }catch(err){
+      msg.textContent='Error: '+err.message;
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function abrirEditarStock(){
+  var rows=SUMINISTROS.map(function(s,i){
+    var qty=(STOCK[s.id]&&STOCK[s.id].qty)||0;
+    return '<tr><td style="font-size:11px;padding:5px 8px;border-bottom:1px solid #f0f0f0;max-width:220px;line-height:1.3">'+esc(s.nom)+'</td>'+
+      '<td style="padding:5px 8px;border-bottom:1px solid #f0f0f0">'+
+      '<input type="number" min="0" value="'+qty+'" data-id="'+s.id+'" style="width:80px;padding:4px 8px;border:1.5px solid #ddd;border-radius:6px;font-size:13px;font-weight:700;text-align:center">'+
+      '</td></tr>';
+  }).join('');
+
+  var d=document.createElement('div');
+  d.className='modal-bg';
+  d.innerHTML='<div class="modal" style="width:460px"><h3>✏️ Editar stock actual</h3>'+
+    '<div style="overflow-y:auto;max-height:50vh;margin-bottom:14px"><table style="width:100%;border-collapse:collapse">'+rows+'</table></div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="cerrarModalBg(this)" style="flex:1;padding:11px;border:1.5px solid #ddd;border-radius:8px;background:none;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'+
+      '<button onclick="guardarStockEditado(this)" style="flex:1;padding:11px;background:var(--ac);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">✓ Guardar</button>'+
+    '</div></div>';
+  document.body.appendChild(d);
+}
+
+function guardarStockEditado(btn){
+  var inputs=btn.closest('.modal-bg').querySelectorAll('input[data-id]');
+  inputs.forEach(function(inp){
+    var id=inp.dataset.id;
+    var qty=parseInt(inp.value)||0;
+    if(!STOCK[id]) STOCK[id]={qty:0,min:2,movs:[]};
+    STOCK[id].qty=qty;
+  });
+  save(); renderStock();
+  btn.closest('.modal-bg').remove();
+  showToast('✓ Stock actualizado');
+}
+
+// ── RANKING ──
+function parseFechaMes(fechaStr){
+  if(!fechaStr) return null;
+  var partes = fechaStr.split('/');
+  if(partes.length===3){
+    var d=parseInt(partes[0]), m=parseInt(partes[1])-1, y=parseInt(partes[2]);
+    if(partes[2].length===2) y+=2000;
+    return {mes:m, anio:y};
+  }
+  var d2=new Date(fechaStr);
+  if(isNaN(d2)) return null;
+  return {mes:d2.getMonth(), anio:d2.getFullYear()};
+}
+
+// Igual que parseFechaMes pero devuelve la fecha completa (con día) — se usa para
+// ordenar el historial día por día de más reciente a más viejo.
+function parseFechaCompleta(fechaStr){
+  if(!fechaStr) return null;
+  var partes=fechaStr.split('/');
+  if(partes.length===3){
+    var d=parseInt(partes[0]), m=parseInt(partes[1])-1, y=parseInt(partes[2]);
+    if(partes[2].length===2) y+=2000;
+    var f=new Date(y,m,d);
+    return isNaN(f)?null:f;
+  }
+  var d2=new Date(fechaStr);
+  return isNaN(d2)?null:d2;
+}
+
+// Timestamp (ms) para ordenar cronológicamente movimientos de stock que traen fecha + hora por separado.
+function parseFechaHoraTs(fechaStr, horaStr){
+  var f=parseFechaCompleta(fechaStr);
+  if(!f) return 0;
+  var ts=f.getTime();
+  if(horaStr){
+    var hp=horaStr.split(':');
+    if(hp.length===2) ts+=(parseInt(hp[0])*60+parseInt(hp[1]))*60000;
+  }
+  return ts;
+}
+
+function getMesesDisponibles(){
+  var mesesSet={};
+  var MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  PEDIDOS.forEach(function(p){
+    if(!p.entregado) return; // solo pedidos entregados (consumo real confirmado)
+    var f=parseFechaMes(p.fecha);
+    if(!f) return;
+    var key=f.anio+'-'+f.mes;
+    if(!mesesSet[key]) mesesSet[key]={mes:f.mes,anio:f.anio,nom:MESES_NOM[f.mes]+' '+f.anio};
+  });
+  return Object.values(mesesSet).sort(function(a,b){return b.anio!==a.anio?b.anio-a.anio:b.mes-a.mes;});
+}
+
+// Arma, para un mes dado, lo entregado agrupado por insumo y por sector (con precio vigente).
+// Lo usa la solapa "Historial" (grilla, resumen por insumo y por persona) y sus exportaciones a Excel.
+function calcularReporteMes(mes, anio){
+  var pedMes=PEDIDOS.filter(function(p){
+    if(!p.entregado) return false; // solo lo realmente entregado (stock ya descontado)
+    var f=parseFechaMes(p.fecha);
+    return f && f.mes===mes && f.anio===anio;
+  });
+  if(!pedMes.length) return null;
+
+  var insumos={};
+  pedMes.forEach(function(p){
+    p.items.forEach(function(it){
+      var sum=SUMINISTROS.find(function(s){return s.id===it.sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
+      var key=sum?sum.id:('__sin_id__'+normTexto(it.nom));
+      if(!insumos[key]) insumos[key]={nom:sum?sum.nom:it.nom,sid:sum?sum.id:null,qty:0,pedidos:0};
+      insumos[key].qty+=it.qty;
+      insumos[key].pedidos+=1;
+    });
+  });
+  var listaInsumos=Object.values(insumos).map(function(x){
+    var precio=x.sid?getPrecio(x.sid):0;
+    x.precio=precio; x.monto=x.qty*precio;
+    return x;
+  }).sort(function(a,b){return b.monto-a.monto;});
+
+  var sectores={};
+  var personasMap={};
+  // pedMes viene filtrado de PEDIDOS, que se inserta con unshift (más nuevo primero) —
+  // por eso la primera vez que aparece una persona+sector en este recorrido es su pedido más reciente.
+  pedMes.forEach(function(p){
+    var sec=p.sector||'Sin sector';
+    if(!sectores[sec]) sectores[sec]={sector:sec,qty:0,monto:0,pedidos:0,personas:{}};
+    sectores[sec].pedidos+=1;
+    var nomPer=p.solicitante||'—';
+    sectores[sec].personas[nomPer]=(sectores[sec].personas[nomPer]||0)+1;
+
+    var keyPer=normTexto(nomPer)+'|'+normTexto(sec);
+    if(!personasMap[keyPer]) personasMap[keyPer]={persona:nomPer,sector:sec,pedidos:0,ultimaFecha:'',monto:0};
+    personasMap[keyPer].pedidos+=1;
+    if(!personasMap[keyPer].ultimaFecha) personasMap[keyPer].ultimaFecha=p.fecha;
+
+    p.items.forEach(function(it){
+      var sum=SUMINISTROS.find(function(s){return s.id===it.sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
+      var precio=sum?getPrecio(sum.id):0;
+      var monto=it.qty*precio;
+      sectores[sec].qty+=it.qty;
+      sectores[sec].monto+=monto;
+      personasMap[keyPer].monto+=monto;
+    });
+  });
+  var listaSectores=Object.values(sectores).map(function(x){
+    x.numPersonas=Object.keys(x.personas).length;
+    return x;
+  }).sort(function(a,b){return b.monto-a.monto;});
+  // Ascendente por cantidad de pedidos: así las personas/sectores que casi no pidieron
+  // este mes quedan arriba, para detectar de un vistazo quién se olvidó de pedir.
+  var listaPersonas=Object.values(personasMap).sort(function(a,b){
+    return a.pedidos-b.pedidos || a.persona.localeCompare(b.persona);
+  });
+
+  var totalMonto=listaInsumos.reduce(function(a,x){return a+x.monto;},0);
+  var totalQty=listaInsumos.reduce(function(a,x){return a+x.qty;},0);
+  var totalPersonas=new Set(pedMes.map(function(p){return p.solicitante;})).size;
+
+  return {pedMes:pedMes, insumos:listaInsumos, sectores:listaSectores, personas:listaPersonas,
+          totalMonto:totalMonto, totalQty:totalQty, totalPersonas:totalPersonas};
+}
+
+function poblarSelectorMes(selId, generarFn){
+  var MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var ahora=new Date();
+  var meses=getMesesDisponibles();
+  if(!meses.length) meses=[{mes:ahora.getMonth(),anio:ahora.getFullYear(),nom:MESES_NOM[ahora.getMonth()]+' '+ahora.getFullYear()}];
+  var sel=document.getElementById(selId);
+  var valPrevio=sel?sel.value:null;
+  if(sel){
+    sel.innerHTML=meses.map(function(m,i){return '<option value="'+m.mes+'|'+m.anio+'"'+(i===0?' selected':'')+'>'+m.nom+'</option>';}).join('');
+    if(valPrevio && meses.some(function(m){return (m.mes+'|'+m.anio)===valPrevio;})) sel.value=valPrevio;
+  }
+  generarFn();
+}
+
+// ── HISTORIAL ──
+var HIST_VISTA='grilla';
+
+function renderHistorial(){ poblarSelectorMes('histMesSel', generarHistorial); }
+
+function cambiarVistaHistorial(v){
+  HIST_VISTA=v;
+  document.getElementById('historialGrillaBody').style.display = v==='grilla' ? 'block':'none';
+  document.getElementById('historialListaBody').style.display = v==='lista' ? 'block':'none';
+  var bG=document.getElementById('histBtnGrilla'), bL=document.getElementById('histBtnLista');
+  bG.style.background = v==='grilla' ? 'var(--ac)':'none';
+  bG.style.color = v==='grilla' ? '#fff':'var(--tx)';
+  bL.style.background = v==='lista' ? 'var(--ac)':'none';
+  bL.style.color = v==='lista' ? '#fff':'var(--tx)';
+}
+
+// Arma la pestaña Historial: un resumen del mes por insumo (lo que antes vivía en la
+// pestaña "Por insumo", con el mismo precio editable) y, debajo, quién pidió qué día y
+// qué pidió — en grilla (día × persona, para cotejar contra el WhatsApp de un vistazo)
+// o en lista, a elección.
+function generarHistorial(){
+  var sel=document.getElementById('histMesSel');
+  if(!sel||!sel.value) return;
+  var MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var partes=sel.value.split('|');
+  var mes=parseInt(partes[0]), anio=parseInt(partes[1]);
+  var nombreMes=MESES_NOM[mes]+' '+anio;
+  var bodyResumen=document.getElementById('historialResumenBody');
+  var bodyGrilla=document.getElementById('historialGrillaBody');
+  var bodyLista=document.getElementById('historialListaBody');
+
+  var r=calcularReporteMes(mes, anio);
+  if(!r){
+    bodyResumen.innerHTML='';
+    bodyGrilla.innerHTML='<div class="empty"><div class="ico">🗓️</div>Sin pedidos registrados en '+nombreMes+'</div>';
+    bodyLista.innerHTML='<div class="empty"><div class="ico">🗓️</div>Sin pedidos registrados en '+nombreMes+'</div>';
+    cambiarVistaHistorial(HIST_VISTA);
+    return;
+  }
+  var sinPrecio=r.insumos.filter(function(x){return !x.sid;});
+
+  // ── Resumen del mes por insumo ──
+  var html='';
+  html+='<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:18px">';
+  [
+    [formatPeso(r.totalMonto),'Monto total'],
+    [r.totalQty.toLocaleString('es-AR'),'Unidades entregadas'],
+    [r.insumos.length,'Insumos distintos'],
+    [r.totalPersonas,'Personas']
+  ].forEach(function(kv){
+    html+='<div style="background:var(--card);border:1px solid var(--br);border-radius:10px;padding:10px 12px">'+
+      '<div style="font-family:Space Mono,monospace;font-size:18px;font-weight:800;color:var(--ac)">'+kv[0]+'</div>'+
+      '<div style="font-size:9.5px;color:var(--mu);text-transform:uppercase;margin-top:2px">'+kv[1]+'</div></div>';
+  });
+  html+='</div>';
+
+  if(sinPrecio.length){
+    html+='<div style="background:var(--rd2);color:var(--rd);border-radius:8px;padding:9px 14px;font-size:11.5px;margin-bottom:14px">'+
+      '⚠ '+sinPrecio.length+' insumo(s) sin coincidencia en el catálogo — no se pudieron valorizar (monto $0): '+
+      sinPrecio.map(function(x){return esc(x.nom);}).join(', ')+'</div>';
+  }
+
+  html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11.5px">';
+  html+='<thead><tr style="background:var(--head)">'+
+    '<th style="text-align:left;padding:8px 10px;color:#fff;font-weight:700">Insumo</th>'+
+    '<th style="text-align:center;padding:8px 8px;color:#fff;font-weight:700">Cant.</th>'+
+    '<th style="text-align:center;padding:8px 8px;color:#fff;font-weight:700">Precio unit.</th>'+
+    '<th style="text-align:right;padding:8px 10px;color:#fff;font-weight:700">Monto</th>'+
+    '<th style="text-align:center;padding:8px 8px;color:#fff;font-weight:500">% del total</th>'+
+  '</tr></thead><tbody>';
+  r.insumos.forEach(function(x,i){
+    var bg=i%2===0?'':'background:var(--bg)';
+    var pct=r.totalMonto>0?(x.monto/r.totalMonto*100).toFixed(1):'0.0';
+    html+='<tr style="border-bottom:1px solid var(--br);'+bg+'">'+
+      '<td style="padding:7px 10px;color:var(--tx)">'+esc(x.nom)+(!x.sid?' <span style="color:var(--rd);font-size:10px">⚠ sin catálogo</span>':'')+'</td>'+
+      '<td style="text-align:center;padding:7px 8px;font-weight:700">'+x.qty.toLocaleString('es-AR')+'</td>'+
+      '<td style="text-align:center;padding:7px 8px">'+
+        (x.sid?
+          '<div style="display:flex;align-items:center;gap:3px;justify-content:center">$<input type="number" min="0" step="0.01" value="'+x.precio+'" data-sid="'+x.sid+'" class="inp-precio-reporte" style="width:78px;padding:3px 5px;border:1px solid var(--br);border-radius:5px;font-size:11px;text-align:right"></div>'
+          :'<span style="color:var(--mu)">—</span>')+
+      '</td>'+
+      '<td style="text-align:right;padding:7px 10px;font-weight:700;color:var(--tx)">'+formatPeso(x.monto)+'</td>'+
+      '<td style="text-align:center;padding:7px 8px;color:var(--mu)">'+pct+'%</td>'+
+    '</tr>';
+  });
+  html+='<tr style="background:var(--yl2)"><td style="padding:8px 10px;font-weight:800">Total</td>'+
+    '<td style="text-align:center;padding:8px 8px;font-weight:800">'+r.totalQty.toLocaleString('es-AR')+'</td>'+
+    '<td></td>'+
+    '<td style="text-align:right;padding:8px 10px;font-weight:800;color:var(--ac)">'+formatPeso(r.totalMonto)+'</td>'+
+    '<td style="text-align:center;padding:8px 8px;font-weight:800">100%</td></tr>';
+  html+='</tbody></table></div>';
+
+  bodyResumen.innerHTML=html;
+
+  // Precio editable → se guarda como precio vigente (ej. última compra) y recalcula todo
+  bodyResumen.querySelectorAll('.inp-precio-reporte').forEach(function(inp){
+    inp.addEventListener('change', function(){
+      actualizarPrecioReporte(this.getAttribute('data-sid'), this.value);
+    });
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter') this.blur(); });
+  });
+
+  // ── Grilla día × persona — para cotejar contra el WhatsApp de un vistazo ──
+  bodyGrilla.innerHTML=construirGrillaHistorial(r, mes, anio);
+
+  // ── Día por día en lista ──
+  var porDia={};
+  r.pedMes.forEach(function(p){
+    var f=p.fecha||'Sin fecha';
+    if(!porDia[f]) porDia[f]=[];
+    porDia[f].push(p);
+  });
+  var fechas=Object.keys(porDia).sort(function(a,b){
+    var fa=parseFechaCompleta(a), fb=parseFechaCompleta(b);
+    if(!fa||!fb) return 0;
+    return fb.valueOf()-fa.valueOf();
+  });
+
+  var htmlLista='';
+  fechas.forEach(function(f){
+    var peds=porDia[f];
+    htmlLista+='<div style="margin-bottom:16px">';
+    htmlLista+='<div style="font-family:Space Mono,monospace;font-size:12px;font-weight:700;color:var(--ac);margin-bottom:6px">'+esc(f)+' · '+peds.length+' pedido'+(peds.length>1?'s':'')+'</div>';
+    htmlLista+='<div style="border:1px solid var(--br);border-radius:10px;overflow:hidden">';
+    peds.forEach(function(p,i){
+      var itemsTxt=(p.items||[]).map(function(it){return esc(it.nom)+' x'+it.qty;}).join(', ');
+      htmlLista+='<div style="padding:10px 14px;'+(i>0?'border-top:1px solid var(--br);':'')+'">'+
+        '<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap">'+
+          '<div><span style="font-weight:700">'+esc(p.solicitante||'—')+'</span> <span style="color:var(--mu)">· 📍 '+esc(p.sector||'—')+'</span></div>'+
+          '<div style="color:var(--mu);font-size:11px">'+esc(p.hora||'')+'</div>'+
+        '</div>'+
+        '<div style="font-size:12px;color:var(--tx);margin-top:4px">'+(itemsTxt||'<span style="color:var(--mu)">sin ítems detectados</span>')+'</div>'+
+      '</div>';
+    });
+    htmlLista+='</div></div>';
+  });
+  bodyLista.innerHTML=htmlLista || '<div class="empty"><div class="ico">🗓️</div>Sin pedidos registrados en '+nombreMes+'</div>';
+
+  cambiarVistaHistorial(HIST_VISTA);
+}
+
+// Grilla tipo planilla: filas = persona (con su desglose de insumos debajo),
+// columnas = cada día del mes que tuvo pedidos (cantidad + valor por día) — para
+// cotejar línea por línea contra el WhatsApp, igual que una planilla armada a mano.
+var MES_ABR=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+
+function construirGrillaHistorial(r, mes, anio){
+  if(!r.pedMes.length) return '<div class="empty"><div class="ico">🗓️</div>Sin pedidos para armar la grilla</div>';
+
+  var personasMap={};
+  r.pedMes.forEach(function(p){
+    var nom=p.solicitante||'—';
+    if(!personasMap[nom]) personasMap[nom]={persona:nom, sector:p.sector||'—'};
+  });
+  var personas=Object.values(personasMap).sort(function(a,b){return a.persona.localeCompare(b.persona);});
+
+  var diasSet={};
+  r.pedMes.forEach(function(p){ var fc=parseFechaCompleta(p.fecha); if(fc) diasSet[fc.getDate()]=true; });
+  var dias=Object.keys(diasSet).map(Number).sort(function(a,b){return a-b;});
+  if(!dias.length) return '<div class="empty"><div class="ico">🗓️</div>Sin pedidos para armar la grilla</div>';
+
+  // datos[persona][dia] = {itemsMap:{insumo:{qty,monto}}, totalMonto}
+  var datos={};
+  personas.forEach(function(pp){ datos[pp.persona]={}; });
+  r.pedMes.forEach(function(p){
+    var fc=parseFechaCompleta(p.fecha);
+    if(!fc) return;
+    var dia=fc.getDate(), nom=p.solicitante||'—';
+    if(!datos[nom]) datos[nom]={};
+    if(!datos[nom][dia]) datos[nom][dia]={itemsMap:{}, totalMonto:0};
+    (p.items||[]).forEach(function(it){
+      var sum=SUMINISTROS.find(function(s){return s.id===it.sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
+      var precio=sum?getPrecio(sum.id):0;
+      var monto=it.qty*precio;
+      if(!datos[nom][dia].itemsMap[it.nom]) datos[nom][dia].itemsMap[it.nom]={qty:0, monto:0};
+      datos[nom][dia].itemsMap[it.nom].qty+=it.qty;
+      datos[nom][dia].itemsMap[it.nom].monto+=monto;
+      datos[nom][dia].totalMonto+=monto;
+    });
+  });
+
+  var L1=0, L2=110, L3=220; // offsets sticky de las 3 columnas fijas
+  var html='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px;white-space:nowrap">';
+
+  html+='<thead>';
+  html+='<tr style="background:var(--head)">';
+  html+='<th rowspan="2" style="text-align:left;padding:7px 8px;color:#fff;font-weight:700;position:sticky;left:'+L1+'px;background:var(--head);min-width:110px">Nombre</th>';
+  html+='<th rowspan="2" style="text-align:left;padding:7px 8px;color:#fff;font-weight:700;position:sticky;left:'+L2+'px;background:var(--head);min-width:110px">sector</th>';
+  html+='<th rowspan="2" style="text-align:left;padding:7px 8px;color:#fff;font-weight:700;position:sticky;left:'+L3+'px;background:var(--head);min-width:160px">insumo</th>';
+  dias.forEach(function(d){
+    html+='<th colspan="2" style="text-align:center;padding:7px 8px;color:#fff;font-weight:700;border-left:1px solid rgba(255,255,255,.2)">'+(d<10?'0'+d:d)+'-'+MES_ABR[mes]+'</th>';
+  });
+  html+='</tr><tr style="background:var(--head)">';
+  dias.forEach(function(){
+    html+='<th style="text-align:center;padding:5px 8px;color:#ccc;font-weight:600;border-left:1px solid rgba(255,255,255,.2)">cantidad</th>';
+    html+='<th style="text-align:center;padding:5px 8px;color:#ccc;font-weight:600">valor</th>';
+  });
+  html+='</tr></thead><tbody>';
+
+  personas.forEach(function(pp,idx){
+    var porDia=datos[pp.persona]||{};
+    var insumosSet={};
+    dias.forEach(function(d){ if(porDia[d]) Object.keys(porDia[d].itemsMap).forEach(function(k){ insumosSet[k]=true; }); });
+    var insumos=Object.keys(insumosSet).sort(function(a,b){return a.localeCompare(b);});
+    var gid='gpFila'+idx;
+
+    html+='<tr style="border-top:2px solid var(--br);background:var(--s1)">';
+    html+='<td style="padding:6px 8px;font-weight:800;color:var(--tx);position:sticky;left:'+L1+'px;background:var(--s1)">'+
+      '<span onclick="toggleGrillaPersona(this,\''+gid+'\')" data-abierto="0" style="display:inline-block;width:16px;height:16px;line-height:14px;text-align:center;border:1px solid var(--br);border-radius:4px;margin-right:6px;cursor:pointer;font-weight:800;color:var(--ac);user-select:none">+</span>'+esc(pp.persona)+'</td>';
+    html+='<td style="padding:6px 8px;color:var(--mu);position:sticky;left:'+L2+'px;background:var(--s1)">'+esc(pp.sector)+'</td>';
+    html+='<td style="padding:6px 8px;position:sticky;left:'+L3+'px;background:var(--s1)"></td>';
+    dias.forEach(function(d){
+      var c=porDia[d];
+      html+='<td style="text-align:center;padding:6px 8px"></td>';
+      html+='<td style="text-align:center;padding:6px 8px;font-weight:800;color:'+(c?'var(--ac)':'var(--br)')+'">'+(c?formatPeso(c.totalMonto):'—')+'</td>';
+    });
+    html+='</tr>';
+
+    insumos.forEach(function(nomIns){
+      html+='<tr data-grupo="'+gid+'" style="display:none;border-bottom:1px solid var(--br)">';
+      html+='<td style="padding:5px 8px;position:sticky;left:'+L1+'px;background:var(--bg)"></td>';
+      html+='<td style="padding:5px 8px;position:sticky;left:'+L2+'px;background:var(--bg)"></td>';
+      html+='<td style="padding:5px 8px;color:var(--tx);position:sticky;left:'+L3+'px;background:var(--bg)">'+esc(nomIns)+'</td>';
+      dias.forEach(function(d){
+        var c=porDia[d];
+        var it=c&&c.itemsMap[nomIns];
+        html+='<td style="text-align:center;padding:5px 8px;color:var(--tx)">'+(it?it.qty:'')+'</td>';
+        html+='<td style="text-align:center;padding:5px 8px;color:var(--mu)">'+(it?formatPeso(it.monto):'')+'</td>';
+      });
+      html+='</tr>';
+    });
+  });
+
+  html+='</tbody></table></div>';
+  return html;
+}
+
+// Abre/cierra las filas de insumo de una persona en la grilla (colapsadas por defecto).
+function toggleGrillaPersona(el, gid){
+  var abierto=el.getAttribute('data-abierto')==='1';
+  document.querySelectorAll('tr[data-grupo="'+gid+'"]').forEach(function(f){
+    f.style.display=abierto?'none':'table-row';
+  });
+  el.setAttribute('data-abierto', abierto?'0':'1');
+  el.textContent=abierto?'+':'−';
+}
+
+// Abre/cierra el resumen por insumo (colapsado por defecto, la grilla por persona es lo principal).
+function toggleResumenInsumo(){
+  var wrap=document.getElementById('resumenInsumoWrap');
+  var icon=document.getElementById('iconResumenInsumo');
+  var abierto=wrap.style.display!=='none';
+  wrap.style.display=abierto?'none':'block';
+  icon.textContent=abierto?'+':'−';
+}
+
+function actualizarPrecioReporte(sid, valor){
+  var v=parseFloat(valor);
+  if(isNaN(v)||v<0){showToast('Precio inválido','err');return;}
+  guardarPrecioCustom(sid, v);
+  generarHistorial();
+  showToast('✓ Precio actualizado a '+formatPeso(v)+' — se usa como precio vigente en todo el sistema');
+}
+
+function exportarHistorial(){
+  var sel=document.getElementById('histMesSel');
+  if(!sel||!sel.value){showToast('Generá el historial primero','err');return;}
+  var MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var partes=sel.value.split('|');
+  var mes=parseInt(partes[0]), anio=parseInt(partes[1]);
+  var r=calcularReporteMes(mes, anio);
+  if(!r){showToast('Sin datos para exportar','err');return;}
+
+  // Hoja 1: día por día, un renglón por ítem — para cotejar contra el WhatsApp o guardar al cerrar el mes.
+  var dataDias=[['Fecha','Hora','Solicitante','Sector','Item','Cantidad']];
+  r.pedMes.slice().reverse().forEach(function(p){ // del más viejo al más nuevo dentro del mes
+    if(p.items && p.items.length){
+      p.items.forEach(function(it){
+        dataDias.push([p.fecha, p.hora, p.solicitante, p.sector, it.nom, it.qty]);
+      });
+    } else {
+      dataDias.push([p.fecha, p.hora, p.solicitante, p.sector, '', '']);
+    }
+  });
+
+  // Hoja 2: resumen por insumo del mes (lo que antes era la pestaña "Por insumo").
+  var dataIns=[['Insumo','Cantidad','Precio unitario','Monto','% del total']];
+  r.insumos.forEach(function(x){
+    var pct=r.totalMonto>0?(x.monto/r.totalMonto*100).toFixed(1)+'%':'0%';
+    dataIns.push([x.nom,x.qty,x.precio,x.monto,pct]);
+  });
+  dataIns.push(['Total', r.totalQty, '', r.totalMonto, '100%']);
+
+  // Hoja 3: por persona (lo que antes era la pestaña "Por sector").
+  var dataPer=[['Persona','Sector','Pedidos','Último pedido']];
+  r.personas.forEach(function(x){
+    dataPer.push([x.persona, x.sector, x.pedidos, x.ultimaFecha]);
+  });
+
+  var wsDias=XLSX.utils.aoa_to_sheet(dataDias);
+  wsDias['!cols']=[{wch:12},{wch:8},{wch:22},{wch:26},{wch:40},{wch:10}];
+  var wsIns=XLSX.utils.aoa_to_sheet(dataIns);
+  wsIns['!cols']=[{wch:48},{wch:10},{wch:16},{wch:16},{wch:10}];
+  var wsPer=XLSX.utils.aoa_to_sheet(dataPer);
+  wsPer['!cols']=[{wch:28},{wch:28},{wch:10},{wch:14}];
+
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,wsDias,'Historial');
+  XLSX.utils.book_append_sheet(wb,wsIns,'Resumen por insumo');
+  XLSX.utils.book_append_sheet(wb,wsPer,'Por persona');
+  XLSX.writeFile(wb,'Historial_'+MESES_NOM[mes]+'_'+anio+'.xlsx');
+  showToast('✓ Excel descargado');
+}
+
+// Respaldo completo de TODOS los pedidos cargados (no solo un mes) — un renglón por ítem,
+// pensado como copia de seguridad de lo que hoy vive únicamente en el localStorage del navegador.
+function exportarPedidos(){
+  if(!PEDIDOS.length){showToast('No hay pedidos para exportar','err');return;}
+  var data=[['Fecha','Hora','Sector','Solicitante','Item','Cantidad','Entregado','Fecha entrega','Otros']];
+  PEDIDOS.slice().reverse().forEach(function(p){ // del más viejo al más nuevo
+    if(p.items && p.items.length){
+      p.items.forEach(function(it){
+        data.push([p.fecha, p.hora, p.sector, p.solicitante, it.nom, it.qty, p.entregado?'Sí':'No', p.fechaEntrega||'', p.otros||'']);
+      });
+    } else {
+      data.push([p.fecha, p.hora, p.sector, p.solicitante, '', '', p.entregado?'Sí':'No', p.fechaEntrega||'', p.otros||'']);
+    }
+  });
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:12},{wch:8},{wch:26},{wch:22},{wch:40},{wch:10},{wch:11},{wch:14},{wch:30}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Pedidos');
+  var hoy=new Date();
+  var stamp=('0'+hoy.getDate()).slice(-2)+'-'+('0'+(hoy.getMonth()+1)).slice(-2)+'-'+hoy.getFullYear();
+  XLSX.writeFile(wb,'Respaldo_Pedidos_'+stamp+'.xlsx');
+  showToast('✓ Excel descargado');
+}
+
+// ── COMPRAS ──
+function cerrarModalPrecio(){ if(window._editPrecioDiv) window._editPrecioDiv.remove(); }
+
+function editarPrecio(id){
+  var s=SUMINISTROS.find(function(x){return x.id===id;});
+  if(!s) return;
+  var precio=getPrecio(id);
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center';
+  d.innerHTML='<div style="background:#fff;border-radius:12px;padding:20px;width:320px;max-width:95vw">'+
+    '<div style="font-size:13px;font-weight:700;margin-bottom:4px">Editar precio unitario</div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:12px">'+esc(s.nom)+'</div>'+
+    '<input type="number" id="inputPrecio" value="'+precio+'" style="width:100%;padding:10px;border:1.5px solid var(--br);border-radius:8px;font-size:14px;margin-bottom:12px">'+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="confirmarPrecio('+id+')" style="flex:1;padding:10px;background:var(--gn);color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✓ Guardar</button>'+
+      '<button onclick="cerrarModalPrecio()" style="flex:1;padding:10px;background:none;border:1.5px solid var(--br);border-radius:8px;cursor:pointer">Cancelar</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(d);
+  document.getElementById('inputPrecio').focus();
+  window._editPrecioDiv=d;
+}
+
+function confirmarPrecio(id){
+  var val=parseFloat(document.getElementById('inputPrecio').value);
+  if(isNaN(val)||val<0){showToast('Precio inválido','err');return;}
+  guardarPrecioCustom(id,val);
+  if(window._editPrecioDiv) window._editPrecioDiv.remove();
+  renderCompras();
+  showToast('✓ Precio actualizado');
+}
+
+
+function renderGastos(){
+  var body=document.getElementById('gastosBody');
+  var MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var meses=getMesesDisponibles();
+  var ahora=new Date();
+  if(!meses.length) meses=[{mes:ahora.getMonth(),anio:ahora.getFullYear(),nom:MESES_NOM[ahora.getMonth()]+' '+ahora.getFullYear()}];
+  var selOpts=meses.map(function(m,i){return '<option value="'+m.mes+'|'+m.anio+'"'+(i===0?' selected':'')+'>'+m.nom+'</option>';}).join('');
+
+  body.innerHTML=
+    '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap" id="gastosHdr">'+
+      '<select id="gastosMesSel" onchange="generarGastos()" style="font-size:12px;padding:6px 10px;border-radius:8px;border:1px solid var(--br);background:var(--s1);color:var(--tx)">'+selOpts+'</select>'+
+      '<button class="btn" onclick="generarGastos()" style="background:var(--ac);color:#fff;border:none">📊 Ver gastos</button>'+
+      '<div id="gastosTotalHdr" style="margin-left:auto;font-size:13px;font-weight:700;color:var(--tx)"></div>'+
+    '</div>'+
+    '<div id="gastosResultado"></div>';
+
+  generarGastos();
+}
+
+function generarGastos(){
+  var sel=document.getElementById('gastosMesSel');
+  if(!sel) return;
+  var partes=sel.value.split('|');
+  var mes=parseInt(partes[0]), anio=parseInt(partes[1]);
+  var MESES_NOM=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var nombreMes=MESES_NOM[mes]+' '+anio;
+  var body=document.getElementById('gastosResultado');
+
+  var pedMes=PEDIDOS.filter(function(p){
+    if(!p.entregado) return false; // solo pedidos entregados (consumo real confirmado)
+    var f=parseFechaMes(p.fecha);
+    return f && f.mes===mes && f.anio===anio;
+  });
+
+  if(!pedMes.length){
+    body.innerHTML='<div style="text-align:center;padding:40px;color:var(--mu)">Sin pedidos en '+nombreMes+'</div>';
+    document.getElementById('gastosTotalHdr').textContent='';
+    return;
+  }
+
+  // Agrupar por sector → suministro → cantidad
+  var sectores={};
+  pedMes.forEach(function(p){
+    var sec=p.sector||'Sin sector';
+    if(!sectores[sec]) sectores[sec]={};
+    p.items.forEach(function(it){
+      var sid=it.sid||null;
+      var sum=SUMINISTROS.find(function(s){return s.id===sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
+      var key=sum?sum.id:it.nom;
+      if(!sectores[sec][key]) sectores[sec][key]={nom:sum?sum.nom:it.nom,sid:sum?sum.id:null,qty:0};
+      sectores[sec][key].qty+=it.qty;
+    });
+  });
+
+  var totalGeneral=0;
+  var totalesSector={};
+  Object.keys(sectores).forEach(function(sec){
+    var tot=0;
+    Object.values(sectores[sec]).forEach(function(it){
+      tot+=it.qty*(it.sid?getPrecio(it.sid):0);
+    });
+    totalesSector[sec]=tot;
+    totalGeneral+=tot;
+  });
+
+  // Gráfico por sector
+  var maxSec=Math.max.apply(null,Object.values(totalesSector))||1;
+  var html='<div style="margin-bottom:20px">';
+  html+='<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Gasto por sector — '+nombreMes+'</div>';
+  Object.keys(totalesSector).sort(function(a,b){return totalesSector[b]-totalesSector[a];}).forEach(function(sec){
+    var tot=totalesSector[sec];
+    var pct=Math.round((tot/maxSec)*100);
+    html+='<div style="margin-bottom:10px">'+
+      '<div style="display:flex;justify-content:space-between;margin-bottom:4px">'+
+        '<span style="font-size:12px;font-weight:600;color:var(--tx)">'+esc(sec)+'</span>'+
+        '<span style="font-size:12px;font-weight:700;color:var(--ac)">'+formatPeso(tot)+'</span>'+
+      '</div>'+
+      '<div style="height:10px;background:var(--br);border-radius:5px">'+
+        '<div style="height:100%;width:'+pct+'%;background:var(--ac);border-radius:5px;opacity:.8;transition:width .4s"></div>'+
+      '</div>'+
+    '</div>';
+  });
+  html+='</div>';
+
+  // Detalle por sector
+  html+='<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:10px">Detalle por sector</div>';
+  Object.keys(sectores).sort(function(a,b){return totalesSector[b]-totalesSector[a];}).forEach(function(sec){
+    html+='<div style="background:var(--s1);border:1px solid var(--br);border-radius:10px;padding:12px 14px;margin-bottom:10px">';
+    html+='<div style="font-size:11px;font-weight:700;color:var(--mu);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">📍 '+esc(sec)+'</div>';
+    html+='<table style="width:100%;border-collapse:collapse;font-size:11px">';
+    Object.values(sectores[sec]).forEach(function(it){
+      var precio=it.sid?getPrecio(it.sid):0;
+      var costo=it.qty*precio;
+      html+='<tr style="border-bottom:0.5px solid var(--br)">'+
+        '<td style="padding:5px 0;color:var(--tx)">'+esc(it.nom)+'</td>'+
+        '<td style="text-align:center;padding:5px 8px;color:var(--mu)">×'+it.qty+'</td>'+
+        '<td style="text-align:right;padding:5px 0;color:var(--mu);font-size:10px">'+formatPeso(precio)+' c/u</td>'+
+        '<td style="text-align:right;padding:5px 0 5px 12px;font-weight:600;color:var(--tx)">'+formatPeso(costo)+'</td>'+
+      '</tr>';
+    });
+    html+='<tr><td colspan="3" style="padding:6px 0;font-weight:700;color:var(--tx)">Subtotal '+esc(sec)+'</td>'+
+      '<td style="text-align:right;padding:6px 0 6px 12px;font-weight:800;color:var(--ac);font-size:13px">'+formatPeso(totalesSector[sec])+'</td></tr>';
+    html+='</table></div>';
+  });
+
+  body.innerHTML=html;
+  document.getElementById('gastosTotalHdr').innerHTML='Total mes: <span style="color:var(--ac)">'+formatPeso(totalGeneral)+'</span>';
+}
+
+function renderCompras(){
+  var body=document.getElementById('comprasBody');
+  var necesitan=SUMINISTROS.filter(function(s){
+    if(!esActivo(s.id)) return false; // dado de baja: no se repone más
+    var st=STOCK[s.id]||{qty:0,min:s.min||2};
+    return st.qty<=(s.min||st.min||2);
+  });
+
+  document.getElementById('badgeCompras').textContent=necesitan.length;
+
+  if(!necesitan.length){
+    body.innerHTML='<div class="empty"><div class="ico">✅</div>Todo el stock está en niveles correctos</div>';
+    return;
+  }
+
+  var totalCompra=0;
+  var html='<div style="background:var(--card);border-radius:12px;border:1px solid var(--br);overflow:hidden">';
+  html+='<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:11px">';
+  html+='<thead><tr style="background:var(--head)">'+
+    '<th style="text-align:left;padding:9px 12px;color:#fff;font-weight:700;min-width:180px">Suministro</th>'+
+    '<th style="text-align:center;padding:9px 8px;color:#fff;font-weight:500;min-width:100px">Precio unit.</th>'+
+    '<th style="text-align:center;padding:9px 8px;color:#fff;font-weight:500;min-width:60px">Stock</th>'+
+    '<th style="text-align:center;padding:9px 8px;color:#fff;font-weight:500;min-width:55px">Mín</th>'+
+    '<th style="text-align:center;padding:9px 8px;color:#fff;font-weight:500;min-width:55px">Máx</th>'+
+    '<th style="text-align:center;padding:9px 8px;color:var(--yl);font-weight:600;min-width:70px">A reponer</th>'+
+    '<th style="text-align:center;padding:9px 8px;color:#86efac;font-weight:600;min-width:95px">Costo</th>'+
+  '</tr></thead><tbody>';
+
+  necesitan.forEach(function(s,i){
+    var st=STOCK[s.id]||{qty:0,min:s.min||2};
+    var reponer=Math.max(0,(s.max||30)-st.qty);
+    var precio=getPrecio(s.id);
+    var costo=reponer*precio;
+    totalCompra+=costo;
+    var bg=i%2===0?'':'background:var(--bg)';
+    var qColor=st.qty<=0?'color:var(--rd)':'color:var(--yl)';
+    html+='<tr style="border-bottom:1px solid var(--br);'+bg+'">'+
+      '<td style="padding:9px 12px;font-weight:600;color:var(--tx)">'+esc(s.nom)+'</td>'+
+      '<td style="text-align:center;padding:9px 8px">'+
+        '<div style="display:flex;align-items:center;gap:4px;justify-content:center">'+
+          '<span style="font-size:11px;font-weight:600;color:var(--tx)">'+formatPeso(precio)+'</span>'+
+          '<button data-sid="'+s.id+'" class="btn-edit-precio" style="background:none;border:0.5px solid var(--br);border-radius:4px;padding:1px 5px;font-size:10px;cursor:pointer">&#9999;</button>'+
+        '</div>'+
+      '</td>'+
+      '<td style="text-align:center;padding:9px 8px;font-weight:700;'+qColor+'">'+st.qty.toLocaleString('es-AR')+'</td>'+
+      '<td style="text-align:center;padding:9px 8px;color:var(--mu)">'+(s.min||0).toLocaleString('es-AR')+'</td>'+
+      '<td style="text-align:center;padding:9px 8px;color:var(--mu)">'+(s.max||0).toLocaleString('es-AR')+'</td>'+
+      '<td style="text-align:center;padding:9px 8px;font-weight:700;color:var(--yl)">'+reponer.toLocaleString('es-AR')+'</td>'+
+      '<td style="text-align:center;padding:9px 8px;font-weight:700;color:var(--gn)">'+formatPeso(costo)+'</td>'+
+    '</tr>';
+  });
+
+  html+='</tbody></table>'+
+    '<div style="display:flex;justify-content:flex-end;padding:10px 14px;border-top:1px solid var(--br)">'+
+      '<span style="font-size:13px;font-weight:700;color:var(--tx)">Total compra estimada: <span style="color:var(--ac)">'+formatPeso(totalCompra)+'</span></span>'+
+    '</div></div>';
+  body.innerHTML=html;
+  // Delegación de eventos para botones de precio
+  body.querySelectorAll('.btn-edit-precio').forEach(function(btn){
+    btn.addEventListener('click', function(){ editarPrecio(this.getAttribute('data-sid')); });
+  });
+}
+
+function exportarCompras(){
+  var necesitan=SUMINISTROS.filter(function(s){
+    if(!esActivo(s.id)) return false;
+    var st=STOCK[s.id]||{qty:0,min:2};
+    return st.qty<=st.min;
+  });
+  if(!necesitan.length){alert('No hay suministros que necesiten reposición.');return;}
+
+  var fecha=new Date().toLocaleDateString('es-AR');
+  var data=[
+    ['LISTA DE COMPRAS — AKAPOL'],
+    ['Generada el: '+fecha],
+    [''],
+    ['Suministro','Stock actual','Stock mínimo','Cantidad sugerida a comprar','Estado']
+  ];
+  necesitan.forEach(function(s){
+    var st=STOCK[s.id]||{qty:0,min:2};
+    var sugerido=Math.max(st.min*3-st.qty, st.min);
+    data.push([
+      s.nom,
+      st.qty,
+      st.min,
+      sugerido,
+      st.qty<=0?'Sin stock':'Stock bajo'
+    ]);
+  });
+  data.push(['']);
+  data.push(['Total de ítems a reponer: '+necesitan.length]);
+
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:50},{wch:14},{wch:14},{wch:26},{wch:14}];
+  // Estilo encabezado
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Lista de compras');
+  XLSX.writeFile(wb,'Lista_Compras_Akapol_'+fecha.replace(/\//g,'-')+'.xlsx');
+}
+
+// ── MOVIMIENTOS DE STOCK (kardex: entradas, salidas, ajustes por conteo — con saldo) ──
+// Junta los dos registros que ya lleva la app (STOCK[sid].movs = entradas/salidas,
+// AJUSTES_STOCK[sid] = conteos físicos) en un único movimiento cronológico por insumo.
+// Cada "ajuste por conteo" es un punto de verdad (el conteo físico manda), así que el saldo
+// se recalcula desde ahí — si no hubo ningún conteo antes de un movimiento, se parte del
+// stock inicial cargado al armar la app.
+function exportarMovimientosStock(){
+  var filas=[['Insumo','Fecha','Hora','Tipo','Cantidad','Saldo','Nota']];
+  var huboAlgo=false;
+
+  SUMINISTROS.forEach(function(s){
+    var st=STOCK[s.id]||{qty:0,movs:[]};
+    var eventos=[];
+    (st.movs||[]).forEach(function(m){
+      eventos.push({fecha:m.fecha,hora:m.hora||'',tipo:m.tipo,qty:m.qty,nota:m.nota||'',esAjuste:false,
+        ts:parseFechaHoraTs(m.fecha,m.hora)});
+    });
+    (AJUSTES_STOCK[s.id]||[]).forEach(function(a){
+      eventos.push({fecha:a.fecha,hora:'',qtyNuevo:a.qty,anterior:a.anterior,nota:a.nota||'Conteo físico',esAjuste:true,
+        ts:a.ts||parseFechaHoraTs(a.fecha,'')});
+    });
+    if(!eventos.length) return;
+    eventos.sort(function(a,b){return (a.ts||0)-(b.ts||0);});
+
+    var saldo=null; // se conoce recién al primer punto de referencia (un conteo, o el stock inicial)
+    eventos.forEach(function(ev){
+      if(ev.esAjuste){
+        saldo=ev.qtyNuevo;
+        filas.push([s.nom, ev.fecha, ev.hora, 'Ajuste (conteo)', ev.qtyNuevo-ev.anterior, saldo, ev.nota]);
+      } else {
+        if(saldo===null) saldo=STOCK_INICIAL[s.id]||0;
+        saldo = ev.tipo==='entrada' ? saldo+ev.qty : saldo-ev.qty;
+        filas.push([s.nom, ev.fecha, ev.hora, ev.tipo==='entrada'?'Entrada':'Salida', ev.tipo==='entrada'?ev.qty:-ev.qty, saldo, ev.nota]);
+      }
+      huboAlgo=true;
+    });
+  });
+
+  if(!huboAlgo){ alert('Todavía no hay movimientos de stock registrados.'); return; }
+
+  var ws=XLSX.utils.aoa_to_sheet(filas);
+  ws['!cols']=[{wch:42},{wch:12},{wch:8},{wch:16},{wch:12},{wch:12},{wch:34}];
+
+  var dataSaldo=[['Insumo','Saldo actual','Mínimo','Estado']];
+  SUMINISTROS.forEach(function(s){
+    var stx=STOCK[s.id]||{qty:0,min:s.min||2};
+    var estado=!esActivo(s.id)?'De baja':(stx.qty<=0?'Sin stock':stx.qty<=(s.min||stx.min)?'Stock bajo':'OK');
+    dataSaldo.push([s.nom, stx.qty, s.min||stx.min, estado]);
+  });
+  var ws2=XLSX.utils.aoa_to_sheet(dataSaldo);
+  ws2['!cols']=[{wch:42},{wch:14},{wch:10},{wch:14}];
+
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Movimientos');
+  XLSX.utils.book_append_sheet(wb,ws2,'Saldos actuales');
+  XLSX.writeFile(wb,'Movimientos_stock_'+new Date().toISOString().slice(0,10)+'.xlsx');
+  showToast('✓ Excel descargado');
+}
+
+// ── HELPERS ──
+function crearModal(titulo, contenidoHtml, onConfirm){
+  var d=document.createElement('div');
+  d.className='modal-bg';
+  d.innerHTML='<div class="modal"><h3>'+titulo+'</h3>'+contenidoHtml+
+    '<div style="display:flex;gap:8px">'+
+      '<button onclick="this.closest(\'.modal-bg\').remove()" style="flex:1;padding:11px;border:1.5px solid #ddd;border-radius:8px;background:none;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'+
+      '<button id="btnConfMod" style="flex:1;padding:11px;background:var(--ac);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer">Confirmar</button>'+
+    '</div></div>';
+  document.body.appendChild(d);
+  d.querySelector('#btnConfMod').addEventListener('click', function(){
+    if(onConfirm()) d.remove();
+  });
+  return d;
+}
+
+// ── CALCULADORA SIMPLE (de escritorio, sin relación con los datos del gestor) ──
+var CALC={actual:'0',anterior:null,operador:null,resetSiguiente:false};
+
+function abrirCalculadora(){
+  var viejo=document.getElementById('_modalCalc'); if(viejo) viejo.remove();
+  CALC={actual:'0',anterior:null,operador:null,resetSiguiente:false};
+
+  function btn(label,onclick,bg,color){
+    return '<button onclick="'+onclick+'" style="padding:14px 0;border:none;border-radius:8px;font-size:16px;font-weight:700;cursor:pointer;background:'+(bg||'var(--bg)')+';color:'+(color||'var(--tx)')+'">'+label+'</button>';
+  }
+
+  var modal=document.createElement('div');
+  modal.id='_modalCalc';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px;width:280px;max-width:92vw">'+
+    '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
+      '<div style="font-size:14px;font-weight:700">🧮 Calculadora</div>'+
+      '<button onclick="document.getElementById(\'_modalCalc\').remove()" style="background:none;border:none;font-size:18px;cursor:pointer;color:var(--mu)">✕</button>'+
+    '</div>'+
+    '<div id="calcDisplay" style="background:var(--bg);border-radius:8px;padding:14px 12px;text-align:right;font-family:\'Space Mono\',monospace;font-size:26px;font-weight:700;margin-bottom:12px;overflow-x:auto;white-space:nowrap">0</div>'+
+    '<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">'+
+      btn('C','calcLimpiar()','#fdecea','var(--rd)')+
+      btn('⌫','calcBorrar()','#fdecea','var(--rd)')+
+      btn('%','calcPorcentaje()')+
+      btn('÷','calcOperador(\'÷\')','var(--ac)','#fff')+
+      btn('7','calcDigito(\'7\')')+btn('8','calcDigito(\'8\')')+btn('9','calcDigito(\'9\')')+
+      btn('×','calcOperador(\'×\')','var(--ac)','#fff')+
+      btn('4','calcDigito(\'4\')')+btn('5','calcDigito(\'5\')')+btn('6','calcDigito(\'6\')')+
+      btn('−','calcOperador(\'-\')','var(--ac)','#fff')+
+      btn('1','calcDigito(\'1\')')+btn('2','calcDigito(\'2\')')+btn('3','calcDigito(\'3\')')+
+      btn('+','calcOperador(\'+\')','var(--ac)','#fff')+
+      btn('±','calcSigno()')+btn('0','calcDigito(\'0\')')+btn('.','calcDigito(\'.\')')+
+      btn('=','calcIgual()','#2e7d32','#fff')+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(modal);
+}
+
+function calcActualizarDisplay(){
+  var d=document.getElementById('calcDisplay');
+  if(d) d.textContent=CALC.actual;
+}
+
+function calcDigito(d){
+  if(CALC.resetSiguiente){ CALC.actual='0'; CALC.resetSiguiente=false; }
+  if(d==='.'&&CALC.actual.indexOf('.')!==-1) return;
+  if(CALC.actual==='0'&&d!=='.') CALC.actual=d;
+  else CALC.actual+=d;
+  calcActualizarDisplay();
+}
+
+function calcOperador(op){
+  if(CALC.operador!==null&&!CALC.resetSiguiente) calcIgual();
+  CALC.anterior=parseFloat(CALC.actual);
+  CALC.operador=op;
+  CALC.resetSiguiente=true;
+}
+
+function calcIgual(){
+  if(CALC.operador===null||CALC.anterior===null) return;
+  var b=parseFloat(CALC.actual), r=CALC.anterior;
+  if(CALC.operador==='+') r=CALC.anterior+b;
+  else if(CALC.operador==='-') r=CALC.anterior-b;
+  else if(CALC.operador==='×') r=CALC.anterior*b;
+  else if(CALC.operador==='÷') r=b===0?NaN:CALC.anterior/b;
+  CALC.actual=isNaN(r)?'Error':String(Math.round(r*1e8)/1e8);
+  CALC.operador=null;
+  CALC.anterior=null;
+  CALC.resetSiguiente=true;
+  calcActualizarDisplay();
+}
+
+function calcLimpiar(){
+  CALC={actual:'0',anterior:null,operador:null,resetSiguiente:false};
+  calcActualizarDisplay();
+}
+
+function calcBorrar(){
+  if(CALC.actual.length<=1||CALC.actual==='Error') CALC.actual='0';
+  else CALC.actual=CALC.actual.slice(0,-1);
+  calcActualizarDisplay();
+}
+
+function calcPorcentaje(){
+  CALC.actual=String(parseFloat(CALC.actual)/100);
+  calcActualizarDisplay();
+}
+
+function calcSigno(){
+  CALC.actual=String(parseFloat(CALC.actual)*-1);
+  calcActualizarDisplay();
+}
+
+function actualizarBadge(){
+  var pend=PEDIDOS.filter(function(p){return !p.entregado;}).length;
+  document.getElementById('badgePend').textContent=pend;
+  document.getElementById('badgePend').style.background=pend>0?'var(--yl)':'#888';
+  // Badge compras
+  var necesitan=SUMINISTROS.filter(function(s){
+    if(!esActivo(s.id)) return false;
+    var st=STOCK[s.id]||{qty:0,min:2};
+    return st.qty<=st.min;
+  }).length;
+  document.getElementById('badgeCompras').textContent=necesitan;
+  document.getElementById('badgeCompras').style.background=necesitan>0?'var(--rd)':'#888';
+}
+
+function limpiarPruebas(){
+  if(!confirm('¿Borrar los pedidos NO entregados?\nEsto NO afecta el stock.')) return;
+  PEDIDOS=PEDIDOS.filter(function(p){return p.entregado;});
+  save(); actualizarBadge(); goTab(1);
+}
+
+function exportarExcel(){
+  var data=[['Fecha','Hora','Sector','Solicitante','Suministro','Cantidad','Estado','Fecha Entrega']];
+  PEDIDOS.forEach(function(p){
+    p.items.forEach(function(it){
+      data.push([p.fecha,p.hora,p.sector,p.solicitante,it.nom,it.qty,p.entregado?'Entregado':'Pendiente',p.fechaEntrega||'']);
+    });
+  });
+  var ws=XLSX.utils.aoa_to_sheet(data);
+  ws['!cols']=[{wch:12},{wch:10},{wch:30},{wch:24},{wch:40},{wch:10},{wch:12},{wch:14}];
+  var wb=XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb,ws,'Pedidos');
+
+  // Hoja de stock
+  var stockData=[['Suministro','Stock actual','Mínimo']];
+  SUMINISTROS.forEach(function(s){
+    var st=STOCK[s.id]||{qty:0,min:2};
+    stockData.push([s.nom,st.qty,st.min]);
+  });
+  var ws2=XLSX.utils.aoa_to_sheet(stockData);
+  ws2['!cols']=[{wch:45},{wch:14},{wch:10}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Stock');
+  XLSX.writeFile(wb,'Suministros_Akapol_'+new Date().toLocaleDateString('es-AR').replace(/\//g,'-')+'.xlsx');
+}
+
+function cerrarModalBg(el){ var m=el.closest('.modal-bg'); if(m) m.remove(); }
+
+function esc(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+var _toast;
+function showToast(msg){
+  if(_toast) clearTimeout(_toast);
+  var t=document.getElementById('toast');
+  if(!t){ t=document.createElement('div'); t.id='toast';
+    t.style.cssText='position:fixed;bottom:20px;left:50%;transform:translateX(-50%);background:var(--gn);color:#fff;padding:10px 20px;border-radius:10px;font-size:13px;font-weight:700;z-index:999;transition:opacity .3s';
+    document.body.appendChild(t); }
+  t.textContent=msg; t.style.opacity='1';
+  _toast=setTimeout(function(){t.style.opacity='0';},2500);
+}
+
+// ══════════════════════════════════════════════════════════════
+// SINCRONIZACIÓN CON GOOGLE SHEETS (v7)
+// No cambia la lógica del gestor: cada vez que la app guarda en el navegador,
+// se manda una copia a la planilla. Al abrir, se trae lo último de la planilla.
+// ══════════════════════════════════════════════════════════════
+var SCRIPT_URL = ''; // ← pegar acá la URL /exec del Apps Script
+
+var SYNC_KEYS = ['akapol_gest_pedidos_v1','akapol_gest_stock_v2','akapol_gest_stock_v2_mes',
+                 'akapol_gest_stock_v2_aj','akapol_precios','akapol_bajas'];
+var SYNC_PEND = 'akapol_sync_pendiente'; // hay cambios locales que todavía no llegaron a la planilla
+var _setOrig = Storage.prototype.setItem;
+var _syncTimer = null;
+
+function syncEstado(txt, color){
+  var el=document.getElementById('syncEstado'); if(!el) return;
+  el.textContent=txt; el.style.background=color||'rgba(255,255,255,.12)';
+}
+
+// Cada guardado del gestor pasa por acá: si cambió algo, se programa el envío a la planilla
+Storage.prototype.setItem = function(k, v){
+  var cambio = (this===window.localStorage && SYNC_KEYS.indexOf(k)>=0 && this.getItem(k)!==String(v));
+  _setOrig.call(this, k, v);
+  if(cambio && SCRIPT_URL){
+    _setOrig.call(this, SYNC_PEND, '1');
+    syncEstado('⏳ Guardando…');
+    clearTimeout(_syncTimer);
+    _syncTimer = setTimeout(syncSubir, 1500);
+  }
+};
+
+function syncSubir(){
+  var data={};
+  SYNC_KEYS.forEach(function(k){ var v=localStorage.getItem(k); if(v!==null) data[k]=v; });
+  fetch(SCRIPT_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
+                     body: JSON.stringify({ts:Date.now(), data:data})})
+    .then(function(){
+      localStorage.removeItem(SYNC_PEND);
+      syncEstado('✓ Guardado en planilla', '#2e7d32');
+    })
+    .catch(function(){
+      syncEstado('⚠ Sin conexión — se guarda al volver', '#c0392b');
+      clearTimeout(_syncTimer);
+      _syncTimer = setTimeout(syncSubir, 30000); // reintento
+    });
+}
+
+function syncInicio(){
+  if(!SCRIPT_URL){ syncEstado('💾 Solo este equipo'); init(); return; }
+  // Si quedaron cambios sin subir (ej. se cortó internet), manda lo local primero
+  if(localStorage.getItem(SYNC_PEND)){ init(); syncSubir(); return; }
+  fetch(SCRIPT_URL).then(function(r){ return r.json(); }).then(function(res){
+    if(res && res.data){
+      // La planilla manda: se copian sus datos al navegador
+      SYNC_KEYS.forEach(function(k){
+        if(res.data[k]!==undefined) _setOrig.call(localStorage, k, res.data[k]);
+      });
+      init();
+      syncEstado('✓ Guardado en planilla', '#2e7d32');
+    } else {
+      // Planilla vacía (primera vez): se suben los datos que ya hay en este navegador
+      init(); syncSubir();
+    }
+  }).catch(function(){
+    init();
+    syncEstado('⚠ Sin conexión — usando datos de este equipo', '#c0392b');
+  });
+}
+
+window.addEventListener('online', function(){ if(SCRIPT_URL && localStorage.getItem(SYNC_PEND)) syncSubir(); });
+
+syncInicio();
+</script>
+</body>
+</html>
