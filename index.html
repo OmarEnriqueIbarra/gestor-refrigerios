@@ -886,9 +886,17 @@ function abrirModalNuevoSuministro(){
     var min=parseInt(document.getElementById('_inpMinSum').value)||0;
     var max=parseInt(document.getElementById('_inpMaxSum').value)||0;
     if(!nom){showToast('Ingresá el nombre del suministro','err');return;}
-    // Generar ID único
-    var nuevoId='s'+( SUMINISTROS.length+1).toString().padStart(2,'0')+'_'+Date.now();
-    SUMINISTROS.push({id:nuevoId,nom:nom,precio:precio,min:min,max:max});
+    // Generar ID único: siguiente número libre con formato sNN, para que coincida
+    // con el de la pestaña "Catálogo" de la planilla (antes usaba un sufijo con
+    // la fecha, que no quedaba prolijo en la planilla)
+    var maxNum=0;
+    SUMINISTROS.forEach(function(s){
+      var m=/^s(\d+)$/.exec(s.id);
+      if(m) maxNum=Math.max(maxNum, parseInt(m[1],10));
+    });
+    var nuevoId='s'+(maxNum+1).toString().padStart(2,'0');
+    var nuevoItem={id:nuevoId,nom:nom,precio:precio,min:min,max:max,mult:1};
+    SUMINISTROS.push(nuevoItem);
     STOCK[nuevoId]={qty:qty,min:min,max:max};
     if(qty>0){
       STOCK_MES_INICIAL[nuevoId]=qty;
@@ -898,6 +906,7 @@ function abrirModalNuevoSuministro(){
       AJUSTES_STOCK[nuevoId].push({fecha:fechaStr,qty:qty,anterior:0});
     }
     save();
+    guardarSuministroRemoto(nuevoItem, qty);
     modal.remove();
     renderStock();
     showToast('✓ Suministro "'+nom+'" agregado');
@@ -2056,6 +2065,13 @@ function showToast(msg){
 // SINCRONIZACIÓN CON GOOGLE SHEETS (v9)
 // No cambia la lógica del gestor: cada vez que la app guarda en el navegador,
 // se manda una copia a la planilla. Al abrir, se trae lo último de la planilla.
+//
+// v10: además, el catálogo de suministros (SUMINISTROS) se combina con lo que
+// haya en la pestaña "Catálogo" de la planilla al arrancar — si se edita un
+// precio/mínimo/máximo/nombre ahí, o se agrega una fila nueva, se refleja en el
+// gestor. Y cuando se agrega un suministro desde el botón "+" del gestor, además
+// de quedar disponible en el momento, se manda a la pestaña "Catálogo" para que
+// quede guardado ahí también.
 // ══════════════════════════════════════════════════════════════
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsJAA8Ac44RSCDBPmK_n1MyNNYSjPWDT3pYuES9ajmommkRLxhshJ7O9Y5Lfmzg9gGuQ/exec'; // ← pegar acá la URL /exec del Apps Script
 
@@ -2098,24 +2114,68 @@ function syncSubir(){
     });
 }
 
+// Trae el catálogo de la pestaña "Catálogo" y lo combina con SUMINISTROS:
+// ítem existente (mismo id) → se actualizan nombre/precio/mínimo/máximo/múltiplo;
+// id nuevo → se agrega al final. Si no hay SCRIPT_URL o falla la conexión, sigue
+// con el catálogo de siempre (no bloquea el arranque del gestor).
+function cargarCatalogoRemoto(cb){
+  if(!SCRIPT_URL){ cb(); return; }
+  fetch(SCRIPT_URL + (SCRIPT_URL.indexOf('?')>=0?'&':'?') + 'accion=catalogo')
+    .then(function(r){ return r.json(); })
+    .then(function(res){
+      if(res && res.ok && res.items && res.items.length){
+        res.items.forEach(function(it){
+          if(!it || !it.id) return;
+          var ex=SUMINISTROS.find(function(s){ return s.id===it.id; });
+          if(ex){
+            ex.nom=it.nom; ex.precio=Number(it.precio)||0;
+            ex.min=Number(it.min)||0; ex.max=Number(it.max)||0;
+            ex.mult=Number(it.mult)||1;
+          } else {
+            SUMINISTROS.push({id:it.id, nom:it.nom, precio:Number(it.precio)||0,
+              min:Number(it.min)||0, max:Number(it.max)||0, mult:Number(it.mult)||1});
+          }
+        });
+      }
+      cb();
+    })
+    .catch(function(){ cb(); }); // sin conexión: sigue con el catálogo base de siempre
+}
+
+// Manda un suministro nuevo (agregado desde el botón "+" del gestor) a la pestaña
+// "Catálogo", para que quede guardado ahí y no se pierda al recargar. "Disparar y
+// olvidar" (no-cors), igual que syncSubir: no hace falta leer la respuesta.
+function guardarSuministroRemoto(item, stockInicial){
+  if(!SCRIPT_URL) return;
+  try{
+    fetch(SCRIPT_URL, {method:'POST', mode:'no-cors', headers:{'Content-Type':'text/plain'},
+      body: JSON.stringify({accion:'addSuministro', id:item.id, nom:item.nom, precio:item.precio,
+                             min:item.min, max:item.max, mult:item.mult||1, stockInicial:stockInicial||0})});
+  }catch(e){}
+}
+
+function iniciarApp(){
+  cargarCatalogoRemoto(init);
+}
+
 function syncInicio(){
-  if(!SCRIPT_URL){ syncEstado('💾 Solo este equipo'); init(); return; }
+  if(!SCRIPT_URL){ syncEstado('💾 Solo este equipo'); iniciarApp(); return; }
   // Si quedaron cambios sin subir (ej. se cortó internet), manda lo local primero
-  if(localStorage.getItem(SYNC_PEND)){ init(); syncSubir(); return; }
+  if(localStorage.getItem(SYNC_PEND)){ iniciarApp(); syncSubir(); return; }
   fetch(SCRIPT_URL).then(function(r){ return r.json(); }).then(function(res){
     if(res && res.data && Object.keys(res.data).length){
       // La planilla manda: se copian sus datos al navegador
       SYNC_KEYS.forEach(function(k){
         if(res.data[k]!==undefined) _setOrig.call(localStorage, k, res.data[k]);
       });
-      init();
+      iniciarApp();
       syncEstado('✓ Guardado en planilla', '#2e7d32');
     } else {
       // Planilla vacía (primera vez): se suben los datos que ya hay en este navegador
-      init(); syncSubir();
+      iniciarApp(); syncSubir();
     }
   }).catch(function(){
-    init();
+    iniciarApp();
     syncEstado('⚠ Sin conexión — usando datos de este equipo', '#c0392b');
   });
 }
