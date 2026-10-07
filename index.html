@@ -4,6 +4,13 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Gestor de Suministros — Akapol</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#1c1a17">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Refrigerios">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Space+Mono:wght@400;700&display=swap');
 :root{
@@ -222,6 +229,7 @@ Fecha: 27/06/2026
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script>
 var SK_PED  = 'akapol_gest_pedidos_v1';
 var SK_STOCK= 'akapol_gest_stock_v2';
@@ -507,19 +515,59 @@ function cancelarPreview(){
   document.getElementById('previewDiv').style.display='none';
 }
 
-// Descuenta del stock físico los ítems de un pedido y deja registro del movimiento.
-// Se usa tanto al registrar el pedido (descuento automático) como, por compatibilidad,
-// desde confirmarEntrega() para pedidos pendientes que hayan quedado de antes de este cambio.
-function descontarStockPedido(p, fechaStr, horaStr, nota){
+// Lista de sids únicos de un pedido (un pedido puede traer el mismo insumo repetido
+// en dos líneas — ej. error de tipeo en el WhatsApp — y hay que descontarlo una sola vez).
+function sidsUnicos_(p){
+  var vistos={}, out=[];
   p.items.forEach(function(it){
-    if(!it.sid) return;
-    if(!STOCK[it.sid]) STOCK[it.sid]={qty:0,min:2,movs:[]};
-    if(!STOCK[it.sid].movs) STOCK[it.sid].movs=[];
-    var sumItem=SUMINISTROS.find(function(x){return x.id===it.sid;});
+    if(it.sid && !vistos[it.sid]){ vistos[it.sid]=true; out.push(it.sid); }
+  });
+  return out;
+}
+
+// Cantidad pedida (tipeada) de un sid, sumando todas las líneas del pedido que lo usen.
+function qtyPedidoSid_(p, sid){
+  var total=0;
+  p.items.forEach(function(it){ if(it.sid===sid) total+=it.qty; });
+  return total;
+}
+
+// Cantidad "real" de un sid dentro de un pedido para efectos de stock: si ya pasó por
+// la preparación con QR usa lo escaneado (p.cantPreparada[sid]); si no, usa lo tipeado
+// — así esta misma función sirve para el flujo nuevo y para pedidos viejos/manuales
+// (confirmarEntrega) que no tengan cantPreparada.
+function cantPedidoReal_(p, sid){
+  if(p.cantPreparada && p.cantPreparada[sid]!=null) return p.cantPreparada[sid];
+  return qtyPedidoSid_(p, sid);
+}
+
+// Cantidad REAL (preparada/escaneada, o tipeada si el pedido no pasó por preparación
+// con QR) de una línea de pedido, para usar en reportes de $/cantidades — en vez de
+// la cantidad tipeada en el WhatsApp, que es lo que se usaba antes.
+// "vistos" es un objeto {sid:true} que hay que crear UNA VEZ POR PEDIDO antes de
+// recorrer sus líneas: si el mismo insumo viene repetido en más de una línea del
+// mismo pedido, la cantidad real (que ya viene sumada a nivel de insumo) se cuenta
+// solo en la primera línea y 0 en las siguientes, para no contarla de más.
+function cantRealLinea_(p, it, vistos){
+  if(!it.sid) return it.qty; // insumo no reconocido en el catálogo: no hay "preparado", se deja lo tipeado
+  if(vistos[it.sid]) return 0;
+  vistos[it.sid]=true;
+  return cantPedidoReal_(p, it.sid);
+}
+
+// Descuenta del stock físico los insumos de un pedido (una vez por sid, ver sidsUnicos_)
+// y deja registro del movimiento. Se usa al finalizar la preparación con QR (descuenta
+// lo escaneado, no lo tipeado) y, por compatibilidad, desde confirmarEntrega() para
+// confirmar sin escanear.
+function descontarStockPedido(p, fechaStr, horaStr, nota){
+  sidsUnicos_(p).forEach(function(sid){
+    if(!STOCK[sid]) STOCK[sid]={qty:0,min:2,movs:[]};
+    if(!STOCK[sid].movs) STOCK[sid].movs=[];
+    var sumItem=SUMINISTROS.find(function(x){return x.id===sid;});
     var mult=sumItem&&sumItem.mult?sumItem.mult:1;
-    var cantReal=it.qty*mult;
-    STOCK[it.sid].qty=Math.max(0,STOCK[it.sid].qty-cantReal);
-    STOCK[it.sid].movs.unshift({
+    var cantReal=cantPedidoReal_(p,sid)*mult;
+    STOCK[sid].qty=Math.max(0,STOCK[sid].qty-cantReal);
+    STOCK[sid].movs.unshift({
       tipo:'salida',qty:cantReal,
       fecha:fechaStr,
       hora:horaStr,
@@ -530,15 +578,14 @@ function descontarStockPedido(p, fechaStr, horaStr, nota){
 
 // Revierte el descuento de stock de un pedido ya entregado (se usa al anular/rechazar).
 function restaurarStockPedido(p){
-  p.items.forEach(function(it){
-    if(!it.sid) return;
-    if(!STOCK[it.sid]) STOCK[it.sid]={qty:0,min:2,movs:[]};
-    if(!STOCK[it.sid].movs) STOCK[it.sid].movs=[];
-    var sumItem=SUMINISTROS.find(function(x){return x.id===it.sid;});
+  sidsUnicos_(p).forEach(function(sid){
+    if(!STOCK[sid]) STOCK[sid]={qty:0,min:2,movs:[]};
+    if(!STOCK[sid].movs) STOCK[sid].movs=[];
+    var sumItem=SUMINISTROS.find(function(x){return x.id===sid;});
     var mult=sumItem&&sumItem.mult?sumItem.mult:1;
-    var cantReal=it.qty*mult;
-    STOCK[it.sid].qty+=cantReal;
-    STOCK[it.sid].movs.unshift({
+    var cantReal=cantPedidoReal_(p,sid)*mult;
+    STOCK[sid].qty+=cantReal;
+    STOCK[sid].movs.unshift({
       tipo:'entrada',qty:cantReal,
       fecha:('0'+new Date().getDate()).slice(-2)+'/'+('0'+(new Date().getMonth()+1)).slice(-2)+'/'+new Date().getFullYear(),
       hora:('0'+new Date().getHours()).slice(-2)+':'+('0'+new Date().getMinutes()).slice(-2),
@@ -550,20 +597,15 @@ function restaurarStockPedido(p){
 function confirmarPedido(){
   if(!pedidosTemp.length) return;
   var ahora=Date.now();
-  var hoy=new Date();
-  var fechaHoyStr=('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
-  var horaHoyStr=('0'+hoy.getHours()).slice(-2)+':'+('0'+hoy.getMinutes()).slice(-2);
   pedidosTemp.forEach(function(p, idx){
     var nuevo={
       id: ahora+idx,
       fecha:p.fecha, hora:p.hora,
       sector:p.sector, solicitante:p.solicitante,
       items:p.items, otros:p.otros,
-      entregado:true, fechaEntrega:fechaHoyStr
+      entregado:false // queda "por preparar": el stock se descuenta al escanear/preparar, no al tipeo
     };
-    // Descuento automático de stock al registrar el pedido — ya no depende de un
-    // paso manual aparte de "Confirmar entrega".
-    descontarStockPedido(nuevo, fechaHoyStr, horaHoyStr);
+    inicializarEscaneado_(nuevo);
     PEDIDOS.unshift(nuevo);
   });
   var cant=pedidosTemp.length;
@@ -572,9 +614,192 @@ function confirmarPedido(){
   document.getElementById('previewDiv').style.display='none';
   document.getElementById('waMsg').value='';
   actualizarBadge();
-  renderStock();
   goTab(1);
-  showToast('✓ '+cant+' pedido'+(cant>1?'s':'')+' registrado'+(cant>1?'s':'')+' — stock descontado automáticamente');
+  showToast('✓ '+cant+' pedido'+(cant>1?'s':'')+' registrado'+(cant>1?'s':'')+' — queda por preparar (el stock se descuenta al escanear cada insumo)');
+}
+
+// ══════════════════════════════════════════════════════════════
+// PREPARACIÓN CON QR
+// Al confirmar un pedido queda "por preparar" (no descuenta stock). Quien lo arma en
+// el depósito escanea el QR de cada insumo a medida que lo saca; eso se cruza en vivo
+// contra lo pedido. Al finalizar, se descuenta del stock lo ESCANEADO (no lo tipeado
+// en el WhatsApp), y si no coincide con lo pedido queda marcado para revisar.
+// ══════════════════════════════════════════════════════════════
+var _qrScanner = null;
+var _prepPedidoId = null;
+var _ultimoScanTxt = null;
+var _ultimoScanTs = 0;
+
+// Asegura que el pedido tenga un contador de escaneo (0) para cada insumo reconocido
+// que tenga. Los ítems sin sid (no encontrados en el catálogo) no se pueden escanear
+// ni descuentan stock — quedan afuera de este conteo.
+function inicializarEscaneado_(p){
+  if(!p.escaneado) p.escaneado={};
+  p.items.forEach(function(it){
+    if(it.sid && p.escaneado[it.sid]==null) p.escaneado[it.sid]=0;
+  });
+}
+
+function abrirPreparacion(id){
+  var p=PEDIDOS.find(function(x){return String(x.id)===String(id);});
+  if(!p||p.entregado) return;
+  inicializarEscaneado_(p);
+  if(!p.items.some(function(it){return it.sid;})){
+    showToast('Este pedido no tiene insumos del catálogo para escanear — usá "Confirmar sin escanear"','err');
+    return;
+  }
+  _prepPedidoId=p.id;
+
+  var viejo=document.getElementById('_modalPrep'); if(viejo) viejo.remove();
+  var modal=document.createElement('div');
+  modal.id='_modalPrep';
+  modal.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:600;display:flex;align-items:center;justify-content:center;padding:14px';
+  modal.innerHTML='<div style="background:#fff;border-radius:14px;padding:20px;width:400px;max-width:100%;max-height:92vh;overflow:auto">'+
+    '<div style="font-size:14px;font-weight:700;margin-bottom:2px">📷 Preparar pedido</div>'+
+    '<div style="font-size:11px;color:var(--mu);margin-bottom:14px">'+esc(p.solicitante)+' · '+esc(p.sector)+'</div>'+
+    '<div id="_qrEstado" style="font-size:11.5px;color:var(--mu);margin-bottom:8px">Iniciando cámara…</div>'+
+    '<div id="qr-reader" style="width:100%;border-radius:10px;overflow:hidden;margin-bottom:14px;background:#000;min-height:180px"></div>'+
+    '<div id="_prepItems" style="display:flex;flex-direction:column;gap:6px;margin-bottom:16px"></div>'+
+    '<div style="display:flex;gap:8px">'+
+      '<button id="_btnFinalizarPrep" style="flex:1;padding:10px;background:#2e7d32;color:#fff;border:none;border-radius:8px;font-weight:700;cursor:pointer">✓ Finalizar preparación</button>'+
+      '<button id="_btnCerrarPrep" style="background:none;border:1px solid var(--br);border-radius:8px;padding:10px 14px;cursor:pointer">Seguir después</button>'+
+    '</div>'+
+  '</div>';
+  document.body.appendChild(modal);
+
+  renderItemsPreparacion_(p);
+
+  document.getElementById('_btnCerrarPrep').onclick=function(){ cerrarPreparacion_(true); };
+  document.getElementById('_btnFinalizarPrep').onclick=function(){ finalizarPreparacion(); };
+
+  // Cámara: si falla (sin permiso, sin HTTPS, sin cámara), se avisa y se sigue
+  // pudiendo preparar a mano con los botones +/- de cada insumo.
+  try{
+    _qrScanner = new Html5Qrcode('qr-reader');
+    _qrScanner.start(
+      {facingMode:'environment'},
+      {fps:10, qrbox:220},
+      function(decodedText){ onScanQR_(decodedText); },
+      function(){ /* no se detectó QR en el frame — normal, se ignora */ }
+    ).then(function(){
+      document.getElementById('_qrEstado').textContent='Apuntá la cámara al QR de cada insumo a medida que lo sacás';
+    }).catch(function(){
+      document.getElementById('_qrEstado').textContent='⚠ No se pudo abrir la cámara (permiso denegado o no disponible) — contá con los botones +/- de cada insumo';
+      document.getElementById('qr-reader').style.display='none';
+    });
+  }catch(e){
+    document.getElementById('_qrEstado').textContent='⚠ Escaneo no disponible en este navegador — contá con los botones +/- de cada insumo';
+  }
+}
+
+// Agrupa los items del pedido por sid (sumando qty si el mismo insumo viene en más
+// de una línea) para que la preparación cuente una sola vez por insumo, no por línea.
+function itemsAgrupadosPrep_(p){
+  var porSid={}, orden=[], sinCatalogo=[];
+  p.items.forEach(function(it){
+    if(!it.sid){ sinCatalogo.push(it); return; }
+    if(!porSid[it.sid]){ porSid[it.sid]={sid:it.sid, nom:it.nom, qty:0}; orden.push(it.sid); }
+    porSid[it.sid].qty+=it.qty;
+  });
+  return {filas: orden.map(function(sid){return porSid[sid];}), sinCatalogo:sinCatalogo};
+}
+
+function renderItemsPreparacion_(p){
+  var cont=document.getElementById('_prepItems');
+  if(!cont) return;
+  var ag=itemsAgrupadosPrep_(p);
+  var htmlSin=ag.sinCatalogo.map(function(it){
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:var(--rd2);border-radius:8px">'+
+      '<span style="font-size:12px;color:var(--rd)">⚠ '+esc(it.nom)+' (no está en el catálogo, no se descuenta stock)</span>'+
+    '</div>';
+  }).join('');
+  var htmlCat=ag.filas.map(function(row){
+    var hecho=p.escaneado[row.sid]||0;
+    var color = hecho===row.qty ? 'var(--gn)' : (hecho>row.qty ? 'var(--rd)' : 'var(--yl)');
+    var bg = hecho===row.qty ? 'var(--gn2)' : (hecho>row.qty ? 'var(--rd2)' : 'var(--yl2)');
+    return '<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 10px;background:'+bg+';border-radius:8px">'+
+      '<div style="min-width:0">'+
+        '<div style="font-size:12px;font-weight:600">'+esc(row.nom)+'</div>'+
+        '<div style="font-size:10.5px;color:var(--mu)">Pedido: ×'+row.qty+'</div>'+
+      '</div>'+
+      '<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">'+
+        '<button onclick="registrarEscaneo_(\''+row.sid+'\',-1)" style="width:26px;height:26px;border:1px solid var(--br);background:#fff;border-radius:6px;cursor:pointer;font-weight:700">−</button>'+
+        '<span style="min-width:34px;text-align:center;font-weight:700;color:'+color+'">'+hecho+'</span>'+
+        '<button onclick="registrarEscaneo_(\''+row.sid+'\',1)" style="width:26px;height:26px;border:1px solid var(--br);background:#fff;border-radius:6px;cursor:pointer;font-weight:700">+</button>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+  cont.innerHTML=htmlSin+htmlCat;
+}
+
+function onScanQR_(decodedText){
+  var txt=String(decodedText||'').trim().toLowerCase();
+  var ahora=Date.now();
+  // Debounce: mientras el QR siga encuadrado en cámara, no contarlo varias veces
+  if(txt===_ultimoScanTxt && (ahora-_ultimoScanTs)<1200) return;
+  _ultimoScanTxt=txt; _ultimoScanTs=ahora;
+
+  var p=PEDIDOS.find(function(x){return String(x.id)===String(_prepPedidoId);});
+  if(!p) return;
+  var tieneItem=p.items.some(function(it){return it.sid===txt;});
+  if(!tieneItem){
+    showToast('Ese insumo no está en este pedido','err');
+    return;
+  }
+  registrarEscaneo_(txt, 1);
+  var s=SUMINISTROS.find(function(x){return x.id===txt;});
+  showToast('✓ '+(s?s.nom:txt)+' escaneado ('+(p.escaneado[txt])+'/'+qtyPedidoSid_(p,txt)+')');
+}
+
+function registrarEscaneo_(sid, delta){
+  var p=PEDIDOS.find(function(x){return String(x.id)===String(_prepPedidoId);});
+  if(!p) return;
+  if(!p.escaneado) p.escaneado={};
+  p.escaneado[sid]=Math.max(0,(p.escaneado[sid]||0)+delta);
+  renderItemsPreparacion_(p);
+}
+
+function cerrarPreparacion_(guardarProgreso){
+  if(_qrScanner){
+    try{
+      _qrScanner.stop().then(function(){ _qrScanner.clear(); }).catch(function(){});
+    }catch(e){}
+    _qrScanner=null;
+  }
+  var modal=document.getElementById('_modalPrep'); if(modal) modal.remove();
+  if(guardarProgreso) save(); // conserva lo escaneado hasta ahora para seguir más tarde
+  _prepPedidoId=null;
+}
+
+function finalizarPreparacion(){
+  var p=PEDIDOS.find(function(x){return String(x.id)===String(_prepPedidoId);});
+  if(!p) return;
+  var hoy=new Date();
+  var fechaHoyStr=('0'+hoy.getDate()).slice(-2)+'/'+('0'+(hoy.getMonth()+1)).slice(-2)+'/'+hoy.getFullYear();
+  var horaHoyStr=('0'+hoy.getHours()).slice(-2)+':'+('0'+hoy.getMinutes()).slice(-2);
+
+  var diffs=[];
+  p.cantPreparada={};
+  sidsUnicos_(p).forEach(function(sid){
+    var hecho=p.escaneado[sid]||0;
+    var pedido=qtyPedidoSid_(p,sid);
+    p.cantPreparada[sid]=hecho;
+    if(hecho!==pedido){
+      var nom=(p.items.find(function(it){return it.sid===sid;})||{}).nom||sid;
+      diffs.push(nom+' (pedido ×'+pedido+', preparado ×'+hecho+')');
+    }
+  });
+
+  if(diffs.length && !confirm('Hay diferencias entre lo pedido y lo escaneado:\n\n'+diffs.join('\n')+'\n\n¿Confirmar así de todos modos? (va a descontar lo escaneado)')) return;
+
+  descontarStockPedido(p, fechaHoyStr, horaHoyStr);
+  p.entregado=true;
+  p.fechaEntrega=fechaHoyStr;
+  p.preparadoConQR=true;
+  save();
+  cerrarPreparacion_(false);
+  renderPedidos(); actualizarBadge(); renderStock();
+  showToast(diffs.length ? '✓ Preparación confirmada — con diferencias marcadas para revisar' : '✓ Preparación confirmada — stock descontado');
 }
 
 // ── RENDER PEDIDOS ──
@@ -629,19 +854,25 @@ function renderPedidos(){
 
   body.innerHTML=items.map(function(p){
     var itemsHtml=p.items.map(function(it){
-      return '<div class="ped-row"><span>'+esc(it.nom)+'</span><span class="ped-qty">×'+it.qty+'</span></div>';
+      var prep = (it.sid && p.cantPreparada && p.cantPreparada[it.sid]!=null) ? p.cantPreparada[it.sid] : null;
+      var dif = (prep!=null && prep!==qtyPedidoSid_(p,it.sid));
+      return '<div class="ped-row"><span>'+esc(it.nom)+(dif?' <span style="color:var(--rd);font-weight:700">⚠ preparado ×'+prep+'</span>':'')+'</span><span class="ped-qty">×'+it.qty+'</span></div>';
     }).join('');
     var badge=p.entregado
       ?'<span class="badge-done">✅ Entregado — stock descontado</span>'
-      :'<span class="badge-pend">⏳ Pendiente</span>';
+      :'<span class="badge-pend">⏳ Por preparar</span>';
     var btn;
     if(!p.entregado){
+      var tieneCatalogo=p.items.some(function(it){return it.sid;});
       btn='<div style="display:flex;gap:8px;margin-top:10px">'+
-        '<button onclick="confirmarEntrega('+p.id+')" style="flex:1;background:var(--gn);color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">✓ Confirmar entrega</button>'+
+        (tieneCatalogo?'<button onclick="abrirPreparacion('+p.id+')" style="flex:1;background:var(--gn);color:#fff;border:none;border-radius:8px;padding:9px;font-size:13px;font-weight:700;cursor:pointer">📷 Preparar con QR</button>':'')+
         '<button onclick="rechazarPedido('+p.id+')" style="background:#fdecea;color:var(--rd);border:1.5px solid #fca5a5;border-radius:8px;padding:9px 14px;font-size:13px;font-weight:700;cursor:pointer">✕ Rechazar</button>'+
+        '</div>'+
+        '<div style="margin-top:6px;text-align:center">'+
+        '<button onclick="confirmarEntrega('+p.id+')" style="background:none;border:none;color:var(--mu);font-size:11px;text-decoration:underline;cursor:pointer">Confirmar sin escanear</button>'+
         '</div>';
     } else {
-      btn='<div style="font-size:11px;color:var(--mu);margin-top:8px">Entregado automáticamente el '+esc(p.fechaEntrega)+'</div>'+
+      btn='<div style="font-size:11px;color:var(--mu);margin-top:8px">'+(p.preparadoConQR?'Preparado con QR el ':'Confirmado el ')+esc(p.fechaEntrega)+'</div>'+
         '<div style="margin-top:8px">'+
         '<button onclick="rechazarPedido('+p.id+')" style="background:#fdecea;color:var(--rd);border:1.5px solid #fca5a5;border-radius:8px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">↩ Anular (restaura stock)</button>'+
         '</div>';
@@ -662,9 +893,9 @@ function rechazarPedido(id){
   var p=PEDIDOS.find(function(x){return String(x.id)===String(id);});
   if(!p) return;
   if(p.entregado){
-    // El pedido ya había descontado stock automáticamente al registrarse: al anularlo,
-    // se lo devuelve para que el saldo quede correcto.
-    if(!confirm('¿Anular este pedido?\nSe va a restaurar el stock que se descontó al registrarlo.')) return;
+    // El pedido ya descontó stock (al prepararlo con QR, o al confirmarlo sin escanear):
+    // al anularlo, se lo devuelve para que el saldo quede correcto.
+    if(!confirm('¿Anular este pedido?\nSe va a restaurar el stock que se descontó al prepararlo/confirmarlo.')) return;
     restaurarStockPedido(p);
     PEDIDOS=PEDIDOS.filter(function(x){return String(x.id)!==String(id);});
     save(); renderPedidos(); actualizarBadge(); renderStock();
@@ -1183,11 +1414,16 @@ function calcularReporteMes(mes, anio){
 
   var insumos={};
   pedMes.forEach(function(p){
+    var vistos={};
     p.items.forEach(function(it){
       var sum=SUMINISTROS.find(function(s){return s.id===it.sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
       var key=sum?sum.id:('__sin_id__'+normTexto(it.nom));
       if(!insumos[key]) insumos[key]={nom:sum?sum.nom:it.nom,sid:sum?sum.id:null,qty:0,pedidos:0};
-      insumos[key].qty+=it.qty;
+      // Cantidad real (preparada/escaneada), no la tipeada en el WhatsApp. Se guía por
+      // it.sid (lo que usó la preparación con QR), no por el "sum" de esta línea, que
+      // es solo para agrupar/mostrar y puede encontrar coincidencia por nombre aunque
+      // it.sid haya quedado null.
+      insumos[key].qty+=cantRealLinea_(p, it, vistos);
       insumos[key].pedidos+=1;
     });
   });
@@ -1213,11 +1449,13 @@ function calcularReporteMes(mes, anio){
     personasMap[keyPer].pedidos+=1;
     if(!personasMap[keyPer].ultimaFecha) personasMap[keyPer].ultimaFecha=p.fecha;
 
+    var vistos={};
     p.items.forEach(function(it){
       var sum=SUMINISTROS.find(function(s){return s.id===it.sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
       var precio=sum?getPrecio(sum.id):0;
-      var monto=it.qty*precio;
-      sectores[sec].qty+=it.qty;
+      var qReal=cantRealLinea_(p, it, vistos); // preparado/escaneado, no lo tipeado
+      var monto=qReal*precio;
+      sectores[sec].qty+=qReal;
       sectores[sec].monto+=monto;
       personasMap[keyPer].monto+=monto;
     });
@@ -1424,12 +1662,14 @@ function construirGrillaHistorial(r, mes, anio){
     var dia=fc.getDate(), nom=p.solicitante||'—';
     if(!datos[nom]) datos[nom]={};
     if(!datos[nom][dia]) datos[nom][dia]={itemsMap:{}, totalMonto:0};
+    var vistos={};
     (p.items||[]).forEach(function(it){
       var sum=SUMINISTROS.find(function(s){return s.id===it.sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
       var precio=sum?getPrecio(sum.id):0;
-      var monto=it.qty*precio;
+      var qReal=cantRealLinea_(p, it, vistos); // preparado/escaneado, no lo tipeado
+      var monto=qReal*precio;
       if(!datos[nom][dia].itemsMap[it.nom]) datos[nom][dia].itemsMap[it.nom]={qty:0, monto:0};
-      datos[nom][dia].itemsMap[it.nom].qty+=it.qty;
+      datos[nom][dia].itemsMap[it.nom].qty+=qReal;
       datos[nom][dia].itemsMap[it.nom].monto+=monto;
       datos[nom][dia].totalMonto+=monto;
     });
@@ -1670,12 +1910,14 @@ function generarGastos(){
   pedMes.forEach(function(p){
     var sec=p.sector||'Sin sector';
     if(!sectores[sec]) sectores[sec]={};
+    var vistos={};
     p.items.forEach(function(it){
       var sid=it.sid||null;
       var sum=SUMINISTROS.find(function(s){return s.id===sid||normTexto(s.nom)===normTexto(it.nom)||normTexto(s.nom)===normTexto(it.nomMatch||'');});
       var key=sum?sum.id:it.nom;
       if(!sectores[sec][key]) sectores[sec][key]={nom:sum?sum.nom:it.nom,sid:sum?sum.id:null,qty:0};
-      sectores[sec][key].qty+=it.qty;
+      // Cantidad real (preparada/escaneada), no la tipeada en el WhatsApp
+      sectores[sec][key].qty+=cantRealLinea_(p, it, vistos);
     });
   });
 
@@ -2072,6 +2314,13 @@ function showToast(msg){
 // gestor. Y cuando se agrega un suministro desde el botón "+" del gestor, además
 // de quedar disponible en el momento, se manda a la pestaña "Catálogo" para que
 // quede guardado ahí también.
+//
+// v11: preparación de pedidos con QR. Un pedido confirmado ya no descuenta stock al
+// tipeo — queda "por preparar". Quien lo arma en el depósito abre "📷 Preparar con QR"
+// y escanea el QR de cada insumo a medida que lo saca (ver etiquetas_qr_refrigerios.html);
+// recién al finalizar se descuenta del stock lo ESCANEADO, no lo pedido, y las diferencias
+// quedan marcadas en la lista de Pedidos para revisar. Sigue habiendo un botón
+// "Confirmar sin escanear" para los casos en que no tenga sentido o no se pueda escanear.
 // ══════════════════════════════════════════════════════════════
 var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbzsJAA8Ac44RSCDBPmK_n1MyNNYSjPWDT3pYuES9ajmommkRLxhshJ7O9Y5Lfmzg9gGuQ/exec'; // ← pegar acá la URL /exec del Apps Script
 
